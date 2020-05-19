@@ -18,11 +18,15 @@ contract('Brick', (accounts) => {
         watchtowers.push(accounts[i + 2])
     }
 
-    const makeBrick = () => Brick.new(bob, watchtowers, { value: FEE / 2 + 5 })
+    const makeBrick = () =>
+        Brick.new(bob, watchtowers, { value: FEE / 2 + 5 })
+
+    const fundBob = (brick) =>
+        brick.fundBob({ from: bob, value: FEE / 2 + 12 })
 
     const makeFundedBrick = async () => {
         const brick = await makeBrick()
-        await brick.fundBob({ from: bob, value: FEE / 2 + 12 })
+        await fundBob(brick)
 
         for (let idx = 0; idx < n; ++idx) {
             await brick.fundWatchtower(idx, { from: watchtowers[idx], value: 5 })
@@ -32,7 +36,7 @@ contract('Brick', (accounts) => {
 
     it('is constructable', async () => {
         await truffleAssert.reverts(Brick.new(bob, watchtowers), 'Alice must pay at least the fee')
-        const brick = await Brick.new(bob, watchtowers, { value: FEE / 2 })
+        const brick = await makeBrick()
 
         assert.equal(await brick._alice(), alice)
         assert.equal(await brick._bob(), bob)
@@ -47,7 +51,7 @@ contract('Brick', (accounts) => {
         assert.equal(await brick._bobFunded(), false)
         await truffleAssert.reverts(brick.fundBob({ from: bob }), 'Bob must pay at least the fee')
         await truffleAssert.reverts(brick.fundWatchtower(0, { from: watchtowers[0] }), '', 'Watchtower cannot fund before Bob')
-        await brick.fundBob({ from: bob, value: FEE / 2 + 12 })
+        await fundBob(brick)
         assert.equal(await brick._bobFunded(), true)
         const {aliceValue, bobValue, autoIncrement} = await brick._initialState()
         assert.equal(aliceValue.toNumber(), 5)
@@ -65,15 +69,29 @@ contract('Brick', (accounts) => {
         }
     })
 
-    const assertBalanceDiff = async (account, operation, expectedDiff) => {
-        const balanceBefore = await web3.eth.getBalance(account)
+    const assertBalanceDiff = async (expectedDiffs, operation) => {
+        let balancesBefore = {}
+
+        for (let { account } of expectedDiffs) {
+            balancesBefore[account] = await web3.eth.getBalance(account)
+        }
+
         const tx = await operation()
         const gasPrice = await web3.eth.getGasPrice()
         const gasUsed = tx.receipt.gasUsed
         const gasCost = gasUsed * gasPrice
-        const balanceAfter = await web3.eth.getBalance(account)
-        const diff = web3.utils.toBN(balanceAfter).sub(web3.utils.toBN(balanceBefore)).add(web3.utils.toBN(gasCost)).toNumber()
-        assert.equal(diff, expectedDiff)
+
+        for (let { account, value, paysForGas } of expectedDiffs) {
+            let balanceAfter = await web3.eth.getBalance(account)
+
+            let actualDiff = web3.utils.toBN(balanceAfter)
+                             .sub(web3.utils.toBN(balancesBefore[account]))
+            if (paysForGas) {
+                actualDiff = actualDiff.add(web3.utils.toBN(gasCost))
+            }
+            actualDiff = actualDiff.toNumber()
+            assert.equal(actualDiff, value)
+        }
     }
 
     it('allows early withdrawals', async () => {
@@ -83,9 +101,8 @@ contract('Brick', (accounts) => {
             'Only the participants can withdraw'
         )
         await assertBalanceDiff(
-            alice,
-            () => brick.withdrawBeforeOpen(0),
-            FEE / 2 + 5
+            [{ account: alice, value: FEE / 2 + 5, paysForGas: true }],
+            () => brick.withdrawBeforeOpen(0)
         )
         await truffleAssert.reverts(
             brick.withdrawBeforeOpen(0, { from: alice }),
@@ -103,11 +120,10 @@ contract('Brick', (accounts) => {
         )
 
         brick = await makeBrick()
-        await brick.fundBob({ from: bob, value: FEE / 2 + 12 })
+        await fundBob(brick)
         await assertBalanceDiff(
-            bob,
-            () => brick.withdrawBeforeOpen(0, { from: bob }),
-            FEE / 2 + 12
+            [{ account: bob, value: FEE / 2 + 12, paysForGas: true }],
+            () => brick.withdrawBeforeOpen(0, { from: bob })
         )
         await truffleAssert.reverts(
             brick.withdrawBeforeOpen(0, { from: bob }),
@@ -115,7 +131,7 @@ contract('Brick', (accounts) => {
         )
 
         brick = await makeBrick()
-        await brick.fundBob({ from: bob, value: FEE / 2 + 12 })
+        await fundBob(brick)
         await brick.fundWatchtower(3, { from: watchtowers[3], value: 5 })
         await brick.fundWatchtower(4, { from: watchtowers[4], value: 5 })
         await truffleAssert.reverts(
@@ -129,22 +145,100 @@ contract('Brick', (accounts) => {
             'A watchtower should not be able to withdraw the money of other watchtowers'
         )
         await assertBalanceDiff(
-            watchtowers[3],
-            () => brick.withdrawBeforeOpen(3, { from: watchtowers[3] }),
-            5
+            [{ account: watchtowers[3], value: 5, paysForGas: true }],
+            () => brick.withdrawBeforeOpen(3, { from: watchtowers[3] })
         )
         await truffleAssert.reverts(
             brick.withdrawBeforeOpen(3, { from: watchtowers[3] }),
             'This watchtower has already withdrawn'
         )
         await assertBalanceDiff(
-            watchtowers[4],
-            () => brick.withdrawBeforeOpen(4, { from: watchtowers[4] }),
-            5
+            [{ account: watchtowers[4], value: 5, paysForGas: true }],
+            () => brick.withdrawBeforeOpen(4, { from: watchtowers[4] })
         )
         await truffleAssert.reverts(
             brick.withdrawBeforeOpen(4, { from: watchtowers[4] }),
             'This watchtower has already withdrawn'
+        )
+    })
+
+    it('opens', async () => {
+        const brick = await makeBrick()
+
+        await truffleAssert.reverts(
+            brick.open(), 'Invalid phase',
+            'Bob must fund channel before opening'
+        )
+        await fundBob(brick)
+        await truffleAssert.reverts(
+            brick.open(),
+            'watchtowers must fund the channel before opening'
+        )
+        await brick.fundWatchtower(0, { from: watchtowers[0], value: 5 })
+        await brick.fundWatchtower(2, { from: watchtowers[2], value: 5 })
+        await truffleAssert.reverts(
+            brick.open(),
+            'All watchtowers must fund the channel before opening'
+        )
+
+        for (let idx = 0; idx < n; ++idx) {
+            if (idx != 0 && idx != 2) {
+                await brick.fundWatchtower(idx, { from: watchtowers[idx], value: 5 })
+            }
+        }
+        await brick.open()
+    })
+
+    it('closes optimistically', async () => {
+        const brick = await makeFundedBrick()
+
+        await truffleAssert.reverts(
+            brick.optimisticAliceClose({
+                aliceValue: 5,
+                bobValue: 12,
+                autoIncrement: 1
+            }),
+            '', 'Should not close channel that is not open'
+        )
+
+        await brick.open()
+
+        await truffleAssert.reverts(
+            brick.optimisticBobClose({ from: bob }),
+            'Bob cannot close on his own'
+        )
+
+        await truffleAssert.reverts(
+            brick.optimisticAliceClose({
+                aliceValue: 6,
+                bobValue: 12,
+                autoIncrement: 1
+            }),
+            'cannot close at a higher value than it began'
+        )
+
+        await brick.optimisticAliceClose({
+            aliceValue: 4,
+            bobValue: 13,
+            autoIncrement: 1
+        }),
+
+        await assertBalanceDiff(
+            [{
+                account: alice,
+                value: 4 + FEE / 2
+            }, {
+                account: bob,
+                value: 13 + FEE / 2,
+                paysForGas: true
+            }, {
+                account: watchtowers[0],
+                value: 5
+            }, {
+                account: watchtowers[7],
+                value: 5
+            }],
+            () => brick.optimisticBobClose({ from: bob })
         )
     })
 })

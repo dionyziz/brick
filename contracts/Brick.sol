@@ -153,14 +153,15 @@ contract Brick {
         // function is called.
         require(closingState.aliceValue + closingState.bobValue <=
                 _initialState.aliceValue + _initialState.bobValue, 'Channel cannot close at a higher value than it began at');
+        // Ensure Alice doesn't later change her mind about the value
+        // in a malicious attempt to frontrun bob's optimisticBobClose()
+        require(!_aliceWantsClose, 'Alice can only decide to close with one state');
         _aliceWantsClose = true;
         _aliceClaimedClosingState = closingState;
     }
 
-    function optimisticBobClose(ChannelState memory bobClaimedClosingState) public openOnly bobOnly {
-        require(_aliceClaimedClosingState.aliceValue == bobClaimedClosingState.aliceValue, 'Bob must agree on Alice value on optimistic close');
-        require(_aliceClaimedClosingState.bobValue == bobClaimedClosingState.bobValue, 'Bob must agree on Alice value on optimistic close');
-        require(_aliceWantsClose);
+    function optimisticBobClose() public openOnly bobOnly {
+        require(_aliceWantsClose, 'Bob cannot close on his own volition');
 
         optimisticClose(_aliceClaimedClosingState);
     }
