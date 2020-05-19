@@ -1,0 +1,11 @@
+{
+  "name": "brick-implementation",
+  "version": "1.0.0",
+  "description": "An implementation of the Brick Ethereum channels in Solidity",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Dionysis Zindros",
+  "license": "MIT"
+}
