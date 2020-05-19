@@ -7,5 +7,12 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Dionysis Zindros",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "mocha": "^7.1.2",
+    "truffle-assertions": "^0.9.2"
+  },
+  "dependencies": {
+    "web3": "^1.2.7"
+  }
 }
