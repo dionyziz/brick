@@ -170,8 +170,8 @@ contract Brick {
 
     function optimisticClose(ChannelState memory closingState) internal openOnly {
         _phase = BrickPhase.Closed;
-        _alice.transfer(closingState.aliceValue);
-        _bob.transfer(closingState.bobValue);
+        _alice.transfer(closingState.aliceValue + FEE / 2);
+        _bob.transfer(closingState.bobValue + FEE / 2);
 
         for (uint256 idx = 0; idx < n; ++idx) {
             _watchtowers[idx].transfer(collateral);
