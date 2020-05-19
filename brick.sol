@@ -20,14 +20,13 @@ contract Brick {
         bytes32 r;
         bytes32 s;
     }
-    struct BlindedState {
-        bytes32 stateHash;
+    struct StatePoint {
         uint256 autoIncrement;
         ECSignature aliceSig;
         ECSignature bobSig;
     }
     struct FraudProof {
-        BlindedState blindedState;
+        StatePoint statePoint;
         ECSignature watchtowerSig;
         uint256 watchtowerIdx;
     }
@@ -47,8 +46,8 @@ contract Brick {
     bool _aliceRecovered = false;
     bool _bobRecovered = false;
 
-    BlindedState[n] _watchtowerLastClaim;
-    BlindedState _bestClaimedState;
+    StatePoint[n] _watchtowerLastClaim;
+    StatePoint _bestClaimedState;
     bool[n] _watchtowerClaimedClose;
     uint256 _numWatchtowerClaims = 0;
     uint256 _maxWatchtowerAutoIncrementClaim = 0;
@@ -178,7 +177,7 @@ contract Brick {
         }
     }
 
-    function watchtowerClaimState(BlindedState memory claimedLastState, uint256 idx) public openOnly {
+    function watchtowerClaimState(StatePoint memory claimedLastState, uint256 idx) public openOnly {
         require(validState(claimedLastState), 'Watchtower claim was invalid');
         require(msg.sender == _watchtowers[idx], 'This is not the watchtower claimed');
         require(!_watchtowerClaimedClose[idx], 'Each watchtower can only submit one pessimistic state');
@@ -192,12 +191,12 @@ contract Brick {
         }
     }
 
-    function pessimisticClose(ChannelState memory closingState, BlindedState memory blindedState, FraudProof[] memory proofs)
+    function pessimisticClose(ChannelState memory closingState, ECSignature memory counterpartySig, FraudProof[] memory proofs)
         public openOnly {
-        // TODO: Check that hash of closing state matches what is submitted by watchtowers
         require(msg.sender == _alice || msg.sender == _bob, 'Only Alice or bob can pessimistically close the channel');
         require(_bestClaimedState.autoIncrement == closingState.autoIncrement, 'Channel must close at latest state');
         require(_numWatchtowerClaims >= 2*_f + 1, 'At least 2f+1 watchtower claims are needed for pessimistic close');
+        require(checkSig(counterparty(msg.sender), keccak256(abi.encode(address(this), closingState)), counterpartySig));
 
         for (uint256 i = 0; i < proofs.length; ++i) {
             uint256 idx = proofs[i].watchtowerIdx;
@@ -234,17 +233,19 @@ contract Brick {
         return ecrecover(plaintext, sig.v, sig.r, sig.s) == pk;
     }
 
-    function validState(BlindedState memory blindedState) internal view returns(bool) {
+    function validState(StatePoint memory statePoint) internal view returns(bool) {
+        bytes32 plaintext = keccak256(abi.encode(address(this), statePoint.autoIncrement));
+
         require(
             checkSig(
                 _alice,
-                blindedState.stateHash,
-                blindedState.aliceSig
+                plaintext,
+                statePoint.aliceSig
             ) &&
             checkSig(
                 _bob,
-                blindedState.stateHash,
-                blindedState.bobSig
+                plaintext,
+                statePoint.bobSig
             ),
             'Channel state does not have valid signatures by Alice and Bob'
         );
@@ -260,14 +261,14 @@ contract Brick {
     function staleClaim(FraudProof memory proof) internal view returns (bool) {
         uint256 watchtowerIdx = proof.watchtowerIdx;
 
-        return proof.blindedState.autoIncrement >
+        return proof.statePoint.autoIncrement >
                _watchtowerLastClaim[watchtowerIdx].autoIncrement;
     }
 
     function validFraudProof(FraudProof memory proof) internal view returns (bool) {
         return checkSig(
             _watchtowers[proof.watchtowerIdx],
-            keccak256(abi.encode(proof.blindedState)),
+            keccak256(abi.encode(address(this), proof.statePoint.autoIncrement)),
             proof.watchtowerSig
         ) && staleClaim(proof);
     }
