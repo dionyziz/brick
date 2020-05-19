@@ -31,18 +31,18 @@ contract Brick {
         uint256 watchtowerIdx;
     }
 
-    uint256 constant n = 13;
-    uint256 constant t = 10;
-    uint256 constant FEE = 2 wei; // must be even
+    uint256 constant public n = 13;
+    uint256 constant public t = 10;
+    uint256 constant public FEE = 20 wei; // must be even
     uint256 _f;
-    address payable _alice;
-    address payable _bob;
-    address payable[n] _watchtowers;
-    BrickPhase _phase;
-    ChannelState initialState;
+    address payable public _alice;
+    address payable public _bob;
+    address payable[n] public _watchtowers;
+    BrickPhase public _phase;
+    ChannelState public initialState;
     bool[n] _watchtowerFunded;
     uint256 collateral = 0;
-    bool _bobFunded = false;
+    bool public _bobFunded = false;
     bool _aliceRecovered = false;
     bool _bobRecovered = false;
 
