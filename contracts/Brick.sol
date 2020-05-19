@@ -34,14 +34,14 @@ contract Brick {
     uint256 constant public n = 13;
     uint256 constant public t = 10;
     uint256 constant public FEE = 20 wei; // must be even
-    uint256 _f;
+    uint256 public _f;
     address payable public _alice;
     address payable public _bob;
     address payable[n] public _watchtowers;
     BrickPhase public _phase;
-    ChannelState public initialState;
-    bool[n] _watchtowerFunded;
-    uint256 collateral = 0;
+    ChannelState public _initialState;
+    bool[n] public _watchtowerFunded;
+    uint256 public _collateral = 0;
     bool public _bobFunded = false;
     bool _aliceRecovered = false;
     bool _bobRecovered = false;
@@ -87,7 +87,7 @@ contract Brick {
 
         require(msg.value >= FEE / 2, 'Alice must pay at least the fee');
         _alice = msg.sender;
-        initialState.aliceValue = msg.value - FEE / 2;
+        _initialState.aliceValue = msg.value - FEE / 2;
         _bob = bob;
         _watchtowers = watchtowers;
     }
@@ -96,17 +96,16 @@ contract Brick {
         // todo: make channel updatable while it is open
         require(!_bobFunded, 'Bob has already funded the channel');
         require(msg.value >= FEE / 2, 'Bob must pay at least the fee');
-        initialState.bobValue = msg.value - FEE / 2;
+        _initialState.bobValue = msg.value - FEE / 2;
         _bobFunded = true;
         // TODO: Check that ceil here is incentive-compatible for watchtower hostage situation
-        collateral = ceil(initialState.aliceValue + initialState.bobValue, _f);
+        _collateral = divceil(_initialState.aliceValue + _initialState.bobValue, _f);
         _phase = BrickPhase.BobFunded;
     }
 
     function fundWatchtower(uint256 idx) external payable atPhase(BrickPhase.BobFunded) {
-        require(_watchtowers[idx] == msg.sender, 'This is not the watchtower claimed');
-        require(msg.value >= collateral, 'Watchtower must pay at least the collateral');
-        _watchtowerFunded[n] = true;
+        require(msg.value >= _collateral, 'Watchtower must pay at least the collateral');
+        _watchtowerFunded[idx] = true;
     }
 
     function withdrawBeforeOpen(uint256 idx) external {
@@ -119,19 +118,19 @@ contract Brick {
         if (msg.sender == _alice) {
             require(!_aliceRecovered);
             _aliceRecovered = true;
-            amount = initialState.aliceValue + FEE / 2;
+            amount = _initialState.aliceValue + FEE / 2;
         }
         else if (msg.sender == _bob) {
             // _bobFunded remains true so that watchtowers can
             // recover collateral
             require(!_bobRecovered);
             _bobRecovered = true;
-            amount = initialState.bobValue + FEE / 2;
+            amount = _initialState.bobValue + FEE / 2;
         }
         else if (msg.sender == _watchtowers[idx]) {
             require(_watchtowerFunded[idx]);
             _watchtowerFunded[idx] = false;
-            amount = collateral;
+            amount = _collateral;
         }
         else {
             revert();
@@ -154,7 +153,7 @@ contract Brick {
         // Alice should stop using the channel off-chain once this
         // function is called.
         require(closingState.aliceValue + closingState.bobValue <=
-                initialState.aliceValue + initialState.bobValue, 'Channel cannot close at a higher value than it began at');
+                _initialState.aliceValue + _initialState.bobValue, 'Channel cannot close at a higher value than it began at');
         _aliceWantsClose = true;
         _aliceClaimedClosingState = closingState;
     }
@@ -173,7 +172,7 @@ contract Brick {
         _bob.transfer(closingState.bobValue + FEE / 2);
 
         for (uint256 idx = 0; idx < n; ++idx) {
-            _watchtowers[idx].transfer(collateral);
+            _watchtowers[idx].transfer(_collateral);
         }
     }
 
@@ -218,7 +217,7 @@ contract Brick {
                 closingState.aliceValue + closingState.bobValue
             );
         }
-        msg.sender.transfer(collateral * proofs.length);
+        msg.sender.transfer(_collateral * proofs.length);
     }
 
     function watchtowerRedeemCollateral(uint256 idx) external atPhase(BrickPhase.Closed) {
@@ -226,7 +225,7 @@ contract Brick {
         require(_watchtowerFunded[idx], 'Malicious watchtower tried to redeem collateral; or honest watchtower tried to redeem collateral twice');
 
         _watchtowerFunded[idx] = false;
-        _watchtowers[idx].transfer(collateral + FEE / _numHonestClosingWatchtowers);
+        _watchtowers[idx].transfer(_collateral + FEE / _numHonestClosingWatchtowers);
     }
 
     function checkSig(address pk, bytes32 plaintext, ECSignature memory sig) internal pure returns(bool) {
@@ -273,7 +272,7 @@ contract Brick {
         ) && staleClaim(proof);
     }
 
-    function ceil(uint a, uint m) internal pure returns (uint) {
-        return ((a + m - 1) / m) * m;
+    function divceil(uint a, uint m) internal pure returns (uint) {
+        return (a + m - 1) / m;
     }
 }

@@ -29,13 +29,28 @@ contract('Brick', (accounts) => {
         for (let i = 0; i < n; ++i) {
             assert.equal(await brick._watchtowers(i), watchtowers[i])
         }
+        assert.equal(await brick._f(), 4)
     })
 
     it('is fundable', async () => {
-        const brick = await Brick.new(bob, watchtowers, { value: FEE / 2 })
+        const brick = await Brick.new(bob, watchtowers, { value: FEE / 2 + 5 })
         assert.equal(await brick._bobFunded(), false)
         await truffleAssert.reverts(brick.fundBob({ from: bob }), 'Bob must pay at least the fee')
-        await brick.fundBob({ from: bob, value: FEE / 2 })
+        await brick.fundBob({ from: bob, value: FEE / 2 + 12 })
         assert.equal(await brick._bobFunded(), true)
+        const {aliceValue, bobValue, autoIncrement} = await brick._initialState()
+        assert.equal(aliceValue.toNumber(), 5)
+        assert.equal(bobValue.toNumber(), 12)
+        assert.equal(autoIncrement.toNumber(), 0)
+
+        await truffleAssert.reverts(brick.fundWatchtower(5, { from: watchtowers[5] }), 'Watchtower must pay at least the collateral')
+
+        assert.equal((await brick._collateral()).toNumber(), 5)
+
+        for (let idx = 0; idx < n; ++idx) {
+            assert.equal(await brick._watchtowerFunded(idx), false)
+            brick.fundWatchtower(idx, { from: watchtowers[idx], value: 5 })
+            assert.equal(await brick._watchtowerFunded(idx), true)
+        }
     })
 })
