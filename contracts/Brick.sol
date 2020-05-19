@@ -113,27 +113,26 @@ contract Brick {
 
         require(_phase == BrickPhase.AliceFunded
              || _phase == BrickPhase.BobFunded
-             || _phase == BrickPhase.Cancelled);
+             || _phase == BrickPhase.Cancelled,
+                'Withdrawals are only allowed early');
 
         if (msg.sender == _alice) {
-            require(!_aliceRecovered);
+            require(!_aliceRecovered, 'Alice has already withdrawn');
             _aliceRecovered = true;
             amount = _initialState.aliceValue + FEE / 2;
         }
         else if (msg.sender == _bob) {
-            // _bobFunded remains true so that watchtowers can
-            // recover collateral
-            require(!_bobRecovered);
-            _bobRecovered = true;
+            require(_bobFunded, 'Bob has already withdrawn');
+            _bobFunded = false;
             amount = _initialState.bobValue + FEE / 2;
         }
         else if (msg.sender == _watchtowers[idx]) {
-            require(_watchtowerFunded[idx]);
+            require(_watchtowerFunded[idx], 'This watchtower has already withdrawn');
             _watchtowerFunded[idx] = false;
             amount = _collateral;
         }
         else {
-            revert();
+            revert('Only the participants can withdraw');
         }
 
         _phase = BrickPhase.Cancelled;
@@ -144,7 +143,7 @@ contract Brick {
         // TODO: if a watchtower has not funded for a while,
         // allow the channel to open without them
         for (uint256 idx = 0; idx < n; ++idx) {
-            require(_watchtowerFunded[idx], 'All watchtower must fund the channel before opening it');
+            require(_watchtowerFunded[idx], 'All watchtowers must fund the channel before opening it');
         }
         _phase = BrickPhase.Open;
     }
