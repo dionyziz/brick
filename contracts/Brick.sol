@@ -248,19 +248,8 @@ contract Brick {
     internal view returns(bool) {
         bytes32 plaintext = keccak256(abi.encode(address(this), announcement.autoIncrement));
 
-        require(
-            checkSig(
-                _alice,
-                plaintext,
-                announcement.aliceSig
-            ) &&
-            checkSig(
-                _bob,
-                plaintext,
-                announcement.bobSig
-            ),
-            'Channel state does not have valid signatures by Alice and Bob'
-        );
+        return checkSig(_alice, plaintext, announcement.aliceSig) &&
+               checkSig(_bob, plaintext, announcement.bobSig);
     }
 
     function counterparty(address party)
