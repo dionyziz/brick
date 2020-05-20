@@ -248,6 +248,49 @@ contract('Brick', (accounts) => {
         )
     })
 
+    it.only('validates signatures', async () => {
+        const brick = await makeOpenBrick()
+        // const plaintext = web3.utils.fromAscii('')
+        const PREFIX = "\x19Ethereum Signed Message:\n"
+        const msg = 'hello'
+        console.log('Message: ', msg)
+        // const msgHash = web3.utils.keccak256(msg)
+        const privKeyAlice = '0x46092bd666b76815030b425294f3138b590f68abaa7eb13713e297fa59bafad9'
+        const sig = await web3.eth.sign(msg, alice)
+        console.log('sig', sig)
+        console.log(
+            'Hash of empty string without prefix: ',
+            web3.utils.keccak256('')
+        )
+        console.log(
+            'Hash of empty string with prefix: ',
+            web3.utils.keccak256('\x19Ethereum Signed Message:\n0')
+        )
+        /*
+        const recovered_pk = await web3.eth.accounts.recover(
+            '', sig.v, sig.r, sig.s, false
+        )
+        */
+
+        console.log('expected: ', alice)
+        let recovered_pk = await web3.eth.accounts.recover(msg, sig)
+        console.log('recovered: ', recovered_pk)
+
+        const r = sig.slice(0, 66)
+        const s = '0x' + sig.slice(66, 130)
+        const v = '0x' + sig.slice(130, 132)
+        // const m = ejsUtils.toBuffer('0xdeadbeef')
+
+        let recovered_pk_2 = await web3.eth.accounts.recover(msg, v, r, s)
+        console.log('recovered from v, r, s', recovered_pk_2)
+
+        const ret = await brick.checkSig.call(
+            alice, web3.utils.keccak256(PREFIX + msg.length + msg), { v, r, s }
+        )
+
+        console.log(ret)
+    })
+
     it('closes pessimistically', async () => {
         const brick = await makeOpenBrick()
         const invalidSig = {
