@@ -1,3 +1,5 @@
+const EUR_IN_ETH = 195.37
+
 module.exports = async (callback) => {
     try {
         console.log('Retrieving accounts')
@@ -39,13 +41,23 @@ module.exports = async (callback) => {
 
         const totalGas = aliceFundGas.add(bobFundGas).add(watchtowersGas)
         console.log('Total gas: ', totalGas.toString())
-        const gasPrice = web3.utils.toBN(await web3.eth.getGasPrice())
-        console.log('Gas price: ', gasPrice.toString())
-        const gasCostWei = totalGas.mul(gasPrice)
-        console.log('Total gas cost in wei: ', gasCostWei.toString())
-        console.log('Total gas cost in ether: ', web3.utils.fromWei(gasCostWei, 'ether').toString())
+        const localGasPrice = web3.utils.toBN(await web3.eth.getGasPrice())
+        const medianGasPrice = web3.utils.toBN(web3.utils.toWei('35', 'gwei'))
+        console.log('Local gas price: ', localGasPrice.toString())
+        console.log('Median gas price: ', medianGasPrice.toString())
+        const localGasCostWei = totalGas.mul(localGasPrice)
+        const medianGasCostWei = totalGas.mul(medianGasPrice)
 
-        console.log('Done')
+        console.log('Local gas cost in wei: ', localGasCostWei.toString())
+        console.log('Median gas cost in wei: ', medianGasCostWei.toString())
+        const localGasCostETH = web3.utils.fromWei(localGasCostWei, 'ether')
+        const medianGasCostETH = web3.utils.fromWei(medianGasCostWei, 'ether')
+        console.log('Total gas cost in ether (local price): ', localGasCostETH, 'ETH')
+        console.log('Total gas cost in ether (median price): ', medianGasCostETH, 'ETH')
+        const localGasCostEUR = localGasCostETH * EUR_IN_ETH
+        const medianGasCostEUR = medianGasCostETH * EUR_IN_ETH
+        console.log('Total gas cost in EUR (local price): ', localGasCostEUR.toFixed(2), '€')
+        console.log('Total gas cost in EUR (median price): ', medianGasCostEUR.toFixed(2), '€')
 
         callback()
     }
