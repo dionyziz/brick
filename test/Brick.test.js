@@ -34,6 +34,12 @@ contract('Brick', (accounts) => {
         return brick
     }
 
+    const makeOpenBrick = async () => {
+        const brick = await makeFundedBrick()
+        await brick.open()
+        return brick
+    }
+
     it('is constructable', async () => {
         // await truffleAssert.reverts(Brick.new(bob, watchtowers), 'Alice must pay at least the fee')
         const brick = await makeBrick()
@@ -239,6 +245,58 @@ contract('Brick', (accounts) => {
                 value: 5
             }],
             () => brick.optimisticBobClose({ from: bob })
+        )
+    })
+
+    it('closes pessimistically', async () => {
+        const brick = await makeOpenBrick()
+        const invalidSig = {
+            v: web3.utils.fromAscii('0'),
+            r: web3.utils.fromAscii('0'),
+            s: web3.utils.fromAscii('0')
+        }
+        const initialState = {
+            aliceValue: 5,
+            bobValue: 12,
+            autoIncrement: 0
+        }
+        const state3 = {
+            aliceValue: 1,
+            bobValue: 1,
+            autoIncrement: 3
+        }
+        const overdraftState = {
+            aliceValue: 100,
+            bobValue: 100,
+            autoIncrement: 0
+        }
+
+        await truffleAssert.reverts(
+            brick.pessimisticClose(state3, invalidSig, [], { from: eve }),
+            'Only Alice or Bob'
+        )
+
+        await truffleAssert.reverts(
+            brick.pessimisticClose(state3, invalidSig, []),
+            'must close at latest state'
+        )
+
+        await truffleAssert.reverts(
+            brick.pessimisticClose(overdraftState, invalidSig, []),
+            'must conserve monetary value'
+        )
+
+        await truffleAssert.reverts(
+            brick.pessimisticClose(initialState, invalidSig, []),
+            'At least 2f+1 watchtower claims are needed'
+        )
+
+        let autoIncrement = 0, aliceSig = invalidSig, bobSig = invalidSig
+        const announcement = {autoIncrement, aliceSig, bobSig}
+
+        await truffleAssert.reverts(
+            brick.watchtowerClaimState({ autoIncrement, aliceSig, bobSig }, 0, { from: watchtowers[0] }),
+            'does not have valid signatures'
         )
     })
 })
