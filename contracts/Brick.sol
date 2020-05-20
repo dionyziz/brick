@@ -75,7 +75,8 @@ contract Brick {
         _;
     }
 
-    constructor(address payable bob, address payable[n] memory watchtowers) public payable {
+    constructor(address payable bob, address payable[n] memory watchtowers)
+    public payable {
         // TODO: watchtower privacy
         // This requirement is needed to ensure watchtowers are not
         // held hostage. If this requirement is not needed, the contract
@@ -104,7 +105,8 @@ contract Brick {
         _phase = BrickPhase.BobFunded;
     }
 
-    function fundWatchtower(uint8 idx) external payable atPhase(BrickPhase.BobFunded) {
+    function fundWatchtower(uint8 idx)
+    external payable atPhase(BrickPhase.BobFunded) {
         require(msg.value >= _collateral, 'Watchtower must pay at least the collateral');
         _watchtowerFunded[idx] = true;
     }
@@ -149,7 +151,8 @@ contract Brick {
         _phase = BrickPhase.Open;
     }
 
-    function optimisticAliceClose(ChannelState memory closingState) public openOnly aliceOnly {
+    function optimisticAliceClose(ChannelState memory closingState)
+    public openOnly aliceOnly {
         // Alice should stop using the channel off-chain once this
         // function is called.
         require(closingState.aliceValue + closingState.bobValue <=
@@ -161,13 +164,15 @@ contract Brick {
         _aliceClaimedClosingState = closingState;
     }
 
-    function optimisticBobClose() public openOnly bobOnly {
+    function optimisticBobClose()
+    public openOnly bobOnly {
         require(_aliceWantsClose, 'Bob cannot close on his own volition');
 
         optimisticClose(_aliceClaimedClosingState);
     }
 
-    function optimisticClose(ChannelState memory closingState) internal openOnly {
+    function optimisticClose(ChannelState memory closingState)
+    internal openOnly {
         _phase = BrickPhase.Closed;
         _alice.transfer(closingState.aliceValue + FEE / 2);
         _bob.transfer(closingState.bobValue + FEE / 2);
@@ -193,13 +198,14 @@ contract Brick {
     }
 
     function pessimisticClose(ChannelState memory closingState, ECSignature memory counterpartySig, FraudProof[] memory proofs)
-        public openOnly {
-        require(msg.sender == _alice || msg.sender == _bob, 'Only Alice or bob can pessimistically close the channel');
+    public openOnly {
+        require(msg.sender == _alice || msg.sender == _bob, 'Only Alice or Bob can pessimistically close the channel');
         require(_bestAnnouncement.autoIncrement == closingState.autoIncrement, 'Channel must close at latest state');
         require(closingState.aliceValue + closingState.bobValue <=
                 _initialState.aliceValue + _initialState.bobValue, 'Channel must conserve monetary value');
         require(_numWatchtowerClaims >= 2*_f + 1, 'At least 2f+1 watchtower claims are needed for pessimistic close');
-        require(checkSig(counterparty(msg.sender), keccak256(abi.encode(address(this), closingState)), counterpartySig));
+        bytes32 plaintext = keccak256(abi.encode(address(this), closingState));
+        require(checkSig(counterparty(msg.sender), plaintext, counterpartySig), 'Counterparty must have signed closing state');
 
         for (uint256 i = 0; i < proofs.length; ++i) {
             uint256 idx = proofs[i].watchtowerIdx;
@@ -224,15 +230,17 @@ contract Brick {
         msg.sender.transfer(_collateral * proofs.length);
     }
 
-    function watchtowerRedeemCollateral(uint256 idx) external atPhase(BrickPhase.Closed) {
+    function watchtowerRedeemCollateral(uint256 idx)
+    external atPhase(BrickPhase.Closed) {
         require(msg.sender == _watchtowers[idx], 'This is not the watchtower claimed');
-        require(_watchtowerFunded[idx], 'Malicious watchtower tried to redeem collateral; or honest watchtower tried to redeem collateral twice');
+        require(_watchtowerFunded[idx], 'Malicious watchtower tried to redeem collateral; or double collateral redeem');
 
         _watchtowerFunded[idx] = false;
         _watchtowers[idx].transfer(_collateral + FEE / _numHonestClosingWatchtowers);
     }
 
-    function checkSig(address pk, bytes32 plaintext, ECSignature memory sig) internal pure returns(bool) {
+    function checkSig(address pk, bytes32 plaintext, ECSignature memory sig)
+    public pure returns(bool) {
         return ecrecover(plaintext, sig.v, sig.r, sig.s) == pk;
     }
 
@@ -255,21 +263,24 @@ contract Brick {
         );
     }
 
-    function counterparty(address party) internal view returns (address payable) {
+    function counterparty(address party)
+    internal view returns (address payable) {
         if (party == _alice) {
             return _bob;
         }
         return _alice;
     }
 
-    function staleClaim(FraudProof memory proof) internal view returns (bool) {
+    function staleClaim(FraudProof memory proof)
+    internal view returns (bool) {
         uint256 watchtowerIdx = proof.watchtowerIdx;
 
         return proof.statePoint.autoIncrement >
                _watchtowerLastClaim[watchtowerIdx].autoIncrement;
     }
 
-    function validFraudProof(FraudProof memory proof) internal view returns (bool) {
+    function validFraudProof(FraudProof memory proof)
+    internal view returns (bool) {
         return checkSig(
             _watchtowers[proof.watchtowerIdx],
             keccak256(abi.encode(address(this), proof.statePoint.autoIncrement)),
@@ -277,7 +288,8 @@ contract Brick {
         ) && staleClaim(proof);
     }
 
-    function divceil(uint a, uint m) internal pure returns (uint) {
+    function divceil(uint a, uint m)
+    internal pure returns (uint) {
         return (a + m - 1) / m;
     }
 }
