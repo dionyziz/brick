@@ -20,13 +20,13 @@ contract Brick {
         bytes32 r;
         bytes32 s;
     }
-    struct StatePoint {
+    struct Announcement {
         uint16 autoIncrement;
         ECSignature aliceSig;
         ECSignature bobSig;
     }
     struct FraudProof {
-        StatePoint statePoint;
+        Announcement statePoint;
         ECSignature watchtowerSig;
         uint8 watchtowerIdx;
     }
@@ -46,8 +46,8 @@ contract Brick {
     bool _aliceRecovered = false;
     bool _bobRecovered = false;
 
-    StatePoint[n] _watchtowerLastClaim;
-    StatePoint _bestClaimedState;
+    Announcement[n] _watchtowerLastClaim;
+    Announcement _bestAnnouncement;
     bool[n] _watchtowerClaimedClose;
     uint8 _numWatchtowerClaims = 0;
     uint16 _maxWatchtowerAutoIncrementClaim = 0;
@@ -177,24 +177,25 @@ contract Brick {
         }
     }
 
-    function watchtowerClaimState(StatePoint memory claimedLastState, uint256 idx) public openOnly {
-        require(validState(claimedLastState), 'Watchtower claim was invalid');
+    function watchtowerClaimState(Announcement memory announcement, uint256 idx)
+    public openOnly {
+        require(validAnnouncement(announcement), 'Announcement does not have valid signatures by Alice and Bob');
         require(msg.sender == _watchtowers[idx], 'This is not the watchtower claimed');
         require(!_watchtowerClaimedClose[idx], 'Each watchtower can only submit one pessimistic state');
-        _watchtowerLastClaim[idx] = claimedLastState;
+        _watchtowerLastClaim[idx] = announcement;
         _watchtowerClaimedClose[idx] = true;
         ++_numWatchtowerClaims;
 
-        if (claimedLastState.autoIncrement > _maxWatchtowerAutoIncrementClaim) {
-            _maxWatchtowerAutoIncrementClaim = claimedLastState.autoIncrement;
-            _bestClaimedState = claimedLastState;
+        if (announcement.autoIncrement > _maxWatchtowerAutoIncrementClaim) {
+            _maxWatchtowerAutoIncrementClaim = announcement.autoIncrement;
+            _bestAnnouncement = announcement;
         }
     }
 
     function pessimisticClose(ChannelState memory closingState, ECSignature memory counterpartySig, FraudProof[] memory proofs)
         public openOnly {
         require(msg.sender == _alice || msg.sender == _bob, 'Only Alice or bob can pessimistically close the channel');
-        require(_bestClaimedState.autoIncrement == closingState.autoIncrement, 'Channel must close at latest state');
+        require(_bestAnnouncement.autoIncrement == closingState.autoIncrement, 'Channel must close at latest state');
         require(_numWatchtowerClaims >= 2*_f + 1, 'At least 2f+1 watchtower claims are needed for pessimistic close');
         require(checkSig(counterparty(msg.sender), keccak256(abi.encode(address(this), closingState)), counterpartySig));
 
@@ -233,19 +234,20 @@ contract Brick {
         return ecrecover(plaintext, sig.v, sig.r, sig.s) == pk;
     }
 
-    function validState(StatePoint memory statePoint) internal view returns(bool) {
-        bytes32 plaintext = keccak256(abi.encode(address(this), statePoint.autoIncrement));
+    function validAnnouncement(Announcement memory announcement)
+    internal view returns(bool) {
+        bytes32 plaintext = keccak256(abi.encode(address(this), announcement.autoIncrement));
 
         require(
             checkSig(
                 _alice,
                 plaintext,
-                statePoint.aliceSig
+                announcement.aliceSig
             ) &&
             checkSig(
                 _bob,
                 plaintext,
-                statePoint.bobSig
+                announcement.bobSig
             ),
             'Channel state does not have valid signatures by Alice and Bob'
         );
