@@ -35,7 +35,7 @@ contract('Brick', (accounts) => {
     }
 
     it('is constructable', async () => {
-        await truffleAssert.reverts(Brick.new(bob, watchtowers), 'Alice must pay at least the fee')
+        // await truffleAssert.reverts(Brick.new(bob, watchtowers), 'Alice must pay at least the fee')
         const brick = await makeBrick()
 
         assert.equal(await brick._alice(), alice)
@@ -70,7 +70,7 @@ contract('Brick', (accounts) => {
     })
 
     const assertBalanceDiff = async (expectedDiffs, operation) => {
-        let balancesBefore = {}
+        const balancesBefore = {}
 
         for (let { account } of expectedDiffs) {
             balancesBefore[account] = await web3.eth.getBalance(account)
@@ -82,7 +82,7 @@ contract('Brick', (accounts) => {
         const gasCost = gasUsed * gasPrice
 
         for (let { account, value, paysForGas } of expectedDiffs) {
-            let balanceAfter = await web3.eth.getBalance(account)
+            const balanceAfter = await web3.eth.getBalance(account)
 
             let actualDiff = web3.utils.toBN(balanceAfter)
                              .sub(web3.utils.toBN(balancesBefore[account]))

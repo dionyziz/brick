@@ -13,7 +13,7 @@ contract Brick {
     struct ChannelState {
         uint256 aliceValue;
         uint256 bobValue;
-        uint256 autoIncrement;
+        uint16 autoIncrement;
     }
     struct ECSignature {
         uint8 v;
@@ -21,20 +21,20 @@ contract Brick {
         bytes32 s;
     }
     struct StatePoint {
-        uint256 autoIncrement;
+        uint16 autoIncrement;
         ECSignature aliceSig;
         ECSignature bobSig;
     }
     struct FraudProof {
         StatePoint statePoint;
         ECSignature watchtowerSig;
-        uint256 watchtowerIdx;
+        uint8 watchtowerIdx;
     }
 
-    uint256 constant public n = 13;
-    uint256 constant public t = 10;
+    uint8 constant public n = 13;
+    uint8 constant public t = 10;
     uint256 constant public FEE = 20 wei; // must be even
-    uint256 public _f;
+    uint8 public _f;
     address payable public _alice;
     address payable public _bob;
     address payable[n] public _watchtowers;
@@ -49,11 +49,11 @@ contract Brick {
     StatePoint[n] _watchtowerLastClaim;
     StatePoint _bestClaimedState;
     bool[n] _watchtowerClaimedClose;
-    uint256 _numWatchtowerClaims = 0;
-    uint256 _maxWatchtowerAutoIncrementClaim = 0;
+    uint8 _numWatchtowerClaims = 0;
+    uint16 _maxWatchtowerAutoIncrementClaim = 0;
     bool _aliceWantsClose = false;
     ChannelState _aliceClaimedClosingState;
-    uint256 _numHonestClosingWatchtowers = 0;
+    uint8 _numHonestClosingWatchtowers = 0;
 
     modifier atPhase(BrickPhase phase) {
         require(_phase == phase, 'Invalid phase');
@@ -80,21 +80,22 @@ contract Brick {
         // This requirement is needed to ensure watchtowers are not
         // held hostage. If this requirement is not needed, the contract
         // works even with n = 0.
-        assert(n > 7);
+        // assert(n > 7);
         // Floor
         _f = (n - 1) / 3;
-        assert(t <= n && t >= 2*_f + 1);
+        // assert(t <= n && t >= 2*_f + 1);
 
-        require(msg.value >= FEE / 2, 'Alice must pay at least the fee');
+        // If Alice pays less than FEE / 2, other parties should refuse to use this contract
+        // but the contract does not need to check this here.
+        // require(msg.value >= FEE / 2, 'Alice must pay at least the fee');
         _alice = msg.sender;
         _initialState.aliceValue = msg.value - FEE / 2;
         _bob = bob;
         _watchtowers = watchtowers;
     }
 
-    function fundBob() external payable atPhase(BrickPhase.AliceFunded) bobOnly {
+    function fundBob() external payable atPhase(BrickPhase.AliceFunded) {
         // todo: make channel updatable while it is open
-        require(!_bobFunded, 'Bob has already funded the channel');
         require(msg.value >= FEE / 2, 'Bob must pay at least the fee');
         _initialState.bobValue = msg.value - FEE / 2;
         _bobFunded = true;
@@ -103,12 +104,12 @@ contract Brick {
         _phase = BrickPhase.BobFunded;
     }
 
-    function fundWatchtower(uint256 idx) external payable atPhase(BrickPhase.BobFunded) {
+    function fundWatchtower(uint8 idx) external payable atPhase(BrickPhase.BobFunded) {
         require(msg.value >= _collateral, 'Watchtower must pay at least the collateral');
         _watchtowerFunded[idx] = true;
     }
 
-    function withdrawBeforeOpen(uint256 idx) external {
+    function withdrawBeforeOpen(uint8 idx) external {
         uint256 amount;
 
         require(_phase == BrickPhase.AliceFunded
@@ -142,7 +143,7 @@ contract Brick {
     function open() external atPhase(BrickPhase.BobFunded) {
         // TODO: if a watchtower has not funded for a while,
         // allow the channel to open without them
-        for (uint256 idx = 0; idx < n; ++idx) {
+        for (uint8 idx = 0; idx < n; ++idx) {
             require(_watchtowerFunded[idx], 'All watchtowers must fund the channel before opening it');
         }
         _phase = BrickPhase.Open;
@@ -205,7 +206,7 @@ contract Brick {
             _watchtowerFunded[idx] = false;
         }
 
-        _numHonestClosingWatchtowers = n - proofs.length;
+        _numHonestClosingWatchtowers = n - uint8(proofs.length);
         _phase = BrickPhase.Closed;
 
         if (proofs.length <= _f) {
