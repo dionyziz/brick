@@ -31,24 +31,24 @@ contract Brick {
         uint8 watchtowerIdx;
     }
 
-    uint8 constant public n = 13;
+    uint8 public _n;
     uint8 constant public t = 10;
     uint256 constant public FEE = 20 wei; // must be even
     uint8 public _f;
     address payable public _alice;
     address payable public _bob;
-    address payable[n] public _watchtowers;
+    address payable[] public _watchtowers;
     BrickPhase public _phase;
     ChannelState public _initialState;
-    bool[n] public _watchtowerFunded;
+    bool[] public _watchtowerFunded;
     uint256 public _collateral = 0;
     bool public _bobFunded = false;
     bool _aliceRecovered = false;
     bool _bobRecovered = false;
 
-    Announcement[n] _watchtowerLastClaim;
+    Announcement[] _watchtowerLastClaim;
     Announcement _bestAnnouncement;
-    bool[n] _watchtowerClaimedClose;
+    bool[] _watchtowerClaimedClose;
     uint8 _numWatchtowerClaims = 0;
     uint16 _maxWatchtowerAutoIncrementClaim = 0;
     bool _aliceWantsClose = false;
@@ -75,7 +75,7 @@ contract Brick {
         _;
     }
 
-    constructor(address payable bob, address payable[n] memory watchtowers)
+    constructor(address payable bob, address payable[] memory watchtowers)
     public payable {
         // TODO: watchtower privacy
         // This requirement is needed to ensure watchtowers are not
@@ -83,7 +83,8 @@ contract Brick {
         // works even with n = 0.
         // assert(n > 7);
         // Floor
-        _f = (n - 1) / 3;
+        _n = uint8(watchtowers.length);
+        _f = (_n - 1) / 3;
         // assert(t <= n && t >= 2*_f + 1);
 
         // If Alice pays less than FEE / 2, other parties should refuse to use this contract
@@ -93,6 +94,11 @@ contract Brick {
         _initialState.aliceValue = msg.value - FEE / 2;
         _bob = bob;
         _watchtowers = watchtowers;
+        for (uint8 i = 0; i < _n; ++i) {
+            _watchtowerFunded.push(false);
+            _watchtowerClaimedClose.push(false);
+            _watchtowerLastClaim.push(Announcement(0, ECSignature(0, 0, 0), ECSignature(0, 0, 0)));
+        }
     }
 
     function fundBob() external payable atPhase(BrickPhase.AliceFunded) {
@@ -101,7 +107,9 @@ contract Brick {
         _initialState.bobValue = msg.value - FEE / 2;
         _bobFunded = true;
         // TODO: Check that ceil here is incentive-compatible for watchtower hostage situation
-        _collateral = divceil(_initialState.aliceValue + _initialState.bobValue, _f);
+        if (_f > 0) {
+            _collateral = divceil(_initialState.aliceValue + _initialState.bobValue, _f);
+        }
         _phase = BrickPhase.BobFunded;
     }
 
@@ -145,7 +153,7 @@ contract Brick {
     function open() external atPhase(BrickPhase.BobFunded) {
         // TODO: if a watchtower has not funded for a while,
         // allow the channel to open without them
-        for (uint8 idx = 0; idx < n; ++idx) {
+        for (uint8 idx = 0; idx < _n; ++idx) {
             require(_watchtowerFunded[idx], 'All watchtowers must fund the channel before opening it');
         }
         _phase = BrickPhase.Open;
@@ -177,7 +185,7 @@ contract Brick {
         _alice.transfer(closingState.aliceValue + FEE / 2);
         _bob.transfer(closingState.bobValue + FEE / 2);
 
-        for (uint256 idx = 0; idx < n; ++idx) {
+        for (uint256 idx = 0; idx < _n; ++idx) {
             _watchtowers[idx].transfer(_collateral);
         }
     }
@@ -215,7 +223,7 @@ contract Brick {
             _watchtowerFunded[idx] = false;
         }
 
-        _numHonestClosingWatchtowers = n - uint8(proofs.length);
+        _numHonestClosingWatchtowers = _n - uint8(proofs.length);
         _phase = BrickPhase.Closed;
 
         if (proofs.length <= _f) {
