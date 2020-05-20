@@ -196,6 +196,8 @@ contract Brick {
         public openOnly {
         require(msg.sender == _alice || msg.sender == _bob, 'Only Alice or bob can pessimistically close the channel');
         require(_bestAnnouncement.autoIncrement == closingState.autoIncrement, 'Channel must close at latest state');
+        require(closingState.aliceValue + closingState.bobValue <=
+                _initialState.aliceValue + _initialState.bobValue, 'Channel must conserve monetary value');
         require(_numWatchtowerClaims >= 2*_f + 1, 'At least 2f+1 watchtower claims are needed for pessimistic close');
         require(checkSig(counterparty(msg.sender), keccak256(abi.encode(address(this), closingState)), counterpartySig));
 
