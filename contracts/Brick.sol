@@ -122,9 +122,9 @@ contract Brick {
     function withdrawBeforeOpen(uint8 idx) external {
         uint256 amount;
 
-        require(_phase == BrickPhase.AliceFunded
-             || _phase == BrickPhase.BobFunded
-             || _phase == BrickPhase.Cancelled,
+        require(_phase == BrickPhase.AliceFunded ||
+                _phase == BrickPhase.BobFunded ||
+                _phase == BrickPhase.Cancelled,
                 'Withdrawals are only allowed early');
 
         if (msg.sender == _alice) {
