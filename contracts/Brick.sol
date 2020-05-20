@@ -32,7 +32,7 @@ contract Brick {
     }
 
     uint8 public _n;
-    uint8 constant public t = 10;
+    uint8 public _t;
     uint256 constant public FEE = 20 wei; // must be even
     uint8 public _f;
     address payable public _alice;
@@ -85,6 +85,7 @@ contract Brick {
         // Floor
         _n = uint8(watchtowers.length);
         _f = (_n - 1) / 3;
+        _t = 2*_f + 1;
         // assert(t <= n && t >= 2*_f + 1);
 
         // If Alice pays less than FEE / 2, other parties should refuse to use this contract
@@ -211,7 +212,7 @@ contract Brick {
         require(_bestAnnouncement.autoIncrement == closingState.autoIncrement, 'Channel must close at latest state');
         require(closingState.aliceValue + closingState.bobValue <=
                 _initialState.aliceValue + _initialState.bobValue, 'Channel must conserve monetary value');
-        require(_numWatchtowerClaims >= 2*_f + 1, 'At least 2f+1 watchtower claims are needed for pessimistic close');
+        require(_numWatchtowerClaims >= _t, 'At least 2f+1 watchtower claims are needed for pessimistic close');
         bytes32 plaintext = keccak256(abi.encode(address(this), closingState));
         require(checkSig(counterparty(msg.sender), plaintext, counterpartySig), 'Counterparty must have signed closing state');
 
