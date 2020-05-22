@@ -1,5 +1,5 @@
 const truffleAssert = require('truffle-assertions')
-
+const { offchainSign, hexToBytes } = require('../src/brick')
 const Brick = artifacts.require('Brick')
 
 contract('Brick', (accounts) => {
@@ -280,36 +280,6 @@ contract('Brick', (accounts) => {
             () => brick.optimisticBobClose({ from: bob })
         )
     })
-
-    const sign = async (msg, pk) => {
-        const sig = await web3.eth.sign(msg, pk)
-
-        const r = sig.slice(0, 66)
-        const s = '0x' + sig.slice(66, 130)
-        const v = '0x' + sig.slice(130, 132)
-
-        return { v: 28, r, s }
-    }
-
-    function hexToBytes(hex) {
-        let bytes = ''
-
-        for (let c = 0; c < hex.length; c += 2) {
-            bytes += String.fromCharCode(parseInt(hex.substr(c, 2), 16))
-        }
-        return bytes
-    }
-
-    function offchainSign(msg, privateKey) {
-        const msgHex = Buffer.from(msg, 'latin1').toString('hex')
-        const msgHashHex = web3.utils.keccak256('0x' + msgHex)
-        const sig = web3.eth.accounts.sign(msgHashHex, privateKey)
-
-        let { v, r, s } = sig
-        v = parseInt(v, 16)
-
-        return { v, r, s }
-    }
 
     it('validates signatures', async () => {
         const brick = await makeOpenBrick()
