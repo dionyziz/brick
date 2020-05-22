@@ -128,8 +128,8 @@ contract('Brick', (accounts) => {
             if (paysForGas) {
                 actualDiff = actualDiff.add(web3.utils.toBN(gasCost))
             }
-            actualDiff = actualDiff.toNumber()
-            assert.equal(actualDiff, value)
+            actualDiff = actualDiff.sub(web3.utils.toBN(value)).toNumber()
+            assert.equal(actualDiff, 0)
         }
     }
 
