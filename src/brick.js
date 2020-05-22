@@ -5,6 +5,8 @@ const channelStateType = {
 }
 const stateType = ['address', { ChannelState: channelStateType }]
 const autoIncrementType = ['address', 'uint16']
+const Web3 = require('Web3')
+const web3 = new Web3(new Web3.providers.HttpProvider('http://localhost:8545'))
 
 function hexToBytes(hex) {
     let bytes = ''
