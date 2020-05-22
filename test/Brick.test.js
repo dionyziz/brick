@@ -1,7 +1,3 @@
-/*
-const ganache = require('ganache-cli')
-const json = require('./../build/contracts/Brick.json')
-*/
 const truffleAssert = require('truffle-assertions')
 
 const Brick = artifacts.require('Brick')
@@ -79,7 +75,6 @@ contract('Brick', (accounts) => {
     }
 
     it('is constructable', async () => {
-        // await truffleAssert.reverts(Brick.new(bob, watchtowers), 'Alice must pay at least the fee')
         const brick = await makeBrick()
 
         assert.equal(await brick._alice(), alice)
