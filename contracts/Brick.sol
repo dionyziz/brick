@@ -263,11 +263,11 @@ contract Brick {
     }
 
     function validAnnouncement(Announcement memory announcement)
-    internal view returns(bool) {
-        bytes32 plaintext = keccak256(abi.encode(address(this), announcement.autoIncrement));
+    public view returns(bool) {
+        bytes32 message = keccak256(abi.encode(address(this), announcement.autoIncrement));
 
-        return checkPrefixedSig(_alice, plaintext, announcement.aliceSig) &&
-               checkPrefixedSig(_bob, plaintext, announcement.bobSig);
+        return checkPrefixedSig(_alice, message, announcement.aliceSig) &&
+               checkPrefixedSig(_bob, message, announcement.bobSig);
     }
 
     function counterparty(address party)
@@ -287,7 +287,7 @@ contract Brick {
     }
 
     function validFraudProof(FraudProof memory proof)
-    internal view returns (bool) {
+    public view returns (bool) {
         return checkPrefixedSig(
             _watchtowers[proof.watchtowerIdx],
             keccak256(abi.encode(address(this), proof.statePoint.autoIncrement)),

@@ -10,12 +10,15 @@ contract('Brick', (accounts) => {
     const alice = accounts[0]
     const bob = accounts[1]
     const n = 13
+    const f = (n - 1) / 3
+    const t = 2 * f + 1
     const eve = accounts[n + 3]
     const FEE = 20
     const watchtowers = []
     // mnemonic: attack guess know manual soap original panel cabbage firm horn whale party
     const aliceAddress = '0x1b501D99fd12cbce4BC87e83EFda420B76C1F01c'
     const alicePrivate = '0x1c56446a08c77d9fe6b47d94f81908c3346dc1230d7e48b3fccf97747c665f7b'
+    const bobAddress = '0xc0D6A8F72aacCAc4B006E6D5870313d846365396'
     const bobPrivate = '0x99fdca82537fb4815cd41215f370e19214d6d77b4705840a16bee5bf3bfa4e59'
     const watchtowersPrivates = [
         '0xcca2de8d9000d2d815b9e15864822a2624b033a6be7b9ddef1d011dbe3d46550',
@@ -33,6 +36,21 @@ contract('Brick', (accounts) => {
         '0xd150663fcf4efe33f5eb627b802831b26207b92084c894440de30ebe78137695',
         '0x0bcaebd1fe5cd1b1181bce6b00c63e76ef9e7c4360297378e913218bbcc825be',
     ]
+    const initialState = {
+        aliceValue: 5,
+        bobValue: 12,
+        autoIncrement: 0
+    }
+    const state3 = {
+        aliceValue: 1,
+        bobValue: 1,
+        autoIncrement: 3
+    }
+    const overdraftState = {
+        aliceValue: 100,
+        bobValue: 100,
+        autoIncrement: 0
+    }
 
     for (let i = 0; i < n; ++i) {
         watchtowers.push(accounts[i + 2])
@@ -288,8 +306,9 @@ contract('Brick', (accounts) => {
     }
 
     function offchainSign(msg, privateKey) {
-        const msgHashHex = web3.utils.keccak256(msg)
-        const sig = web3.eth.accounts.sign(msgHashHex, alicePrivate)
+        const msgHex = Buffer.from(msg, 'latin1').toString('hex')
+        const msgHashHex = web3.utils.keccak256('0x' + msgHex)
+        const sig = web3.eth.accounts.sign(msgHashHex, privateKey)
 
         let { v, r, s } = sig
         v = parseInt(v, 16)
@@ -300,15 +319,16 @@ contract('Brick', (accounts) => {
     it('validates signatures', async () => {
         const brick = await makeOpenBrick()
         const PREFIX = "\x19Ethereum Signed Message:\n"
-        const msg = 'hello'
-        const msgHashHex = web3.utils.keccak256(msg)
+        const msg = '\x88' // 'hello'
+        const msgHex = Buffer.from(msg, 'latin1').toString('hex')
+        const msgHashHex = web3.utils.keccak256('0x' + msgHex)
         const msgHashBytes = hexToBytes(msgHashHex.slice(2))
 
         const prefixedMessage = PREFIX + msgHashBytes.length + msgHashBytes
         const prefixedMessageHex = Buffer.from(prefixedMessage, 'latin1').toString('hex')
         const prefixedMessageHash = web3.utils.keccak256('0x' + prefixedMessageHex)
 
-        let {v, r, s} = offchainSign(msg, alicePrivate)
+        let { v, r, s } = offchainSign(msg, alicePrivate)
 
         assert.equal(
             await brick.checkSig.call(
@@ -345,27 +365,37 @@ contract('Brick', (accounts) => {
         )
     })
 
-    it('closes pessimistically', async () => {
+    it('recognizes valid announcements', async () => {
         const brick = await makeOpenBrick()
+        const encoded = hexToBytes(web3.eth.abi.encodeParameters(
+            ['address', 'uint16'],
+            [brick.address, 0]
+        ).slice(2))
+        const aliceSig = offchainSign(encoded, alicePrivate)
+        const bobSig = offchainSign(encoded, bobPrivate)
+
+        assert.equal(
+            await brick.validAnnouncement.call(
+                {
+                    autoIncrement: 0,
+                    aliceSig,
+                    bobSig
+                },
+                {
+                    from: watchtowers[0]
+                }
+            ),
+            true
+        )
+    })
+
+    it('detects pessimistic closing failures', async () => {
+        const brick = await makeOpenBrick()
+
         const invalidSig = {
             v: web3.utils.fromAscii('0'),
             r: web3.utils.fromAscii('0'),
             s: web3.utils.fromAscii('0')
-        }
-        const initialState = {
-            aliceValue: 5,
-            bobValue: 12,
-            autoIncrement: 0
-        }
-        const state3 = {
-            aliceValue: 1,
-            bobValue: 1,
-            autoIncrement: 3
-        }
-        const overdraftState = {
-            aliceValue: 100,
-            bobValue: 100,
-            autoIncrement: 0
         }
 
         await truffleAssert.reverts(
@@ -394,6 +424,77 @@ contract('Brick', (accounts) => {
         await truffleAssert.reverts(
             brick.watchtowerClaimState({ autoIncrement, aliceSig, bobSig }, 0, { from: watchtowers[0] }),
             'does not have valid signatures'
+        )
+
+        let encoded = hexToBytes(web3.eth.abi.encodeParameters(
+            [
+                'address',
+                'uint16'
+            ],
+            [
+                brick.address,
+                0
+            ]
+        ).slice(2))
+        aliceSig = offchainSign(encoded, alicePrivate)
+        bobSig = offchainSign(encoded, bobPrivate)
+
+        await truffleAssert.reverts(
+            brick.watchtowerClaimState({
+                autoIncrement: 0,
+                aliceSig,
+                bobSig
+            }, 0, { from: watchtowers[1] }),
+            'This is not the watchtower claimed'
+        )
+
+        for (let i = 0; i < t; ++i) {
+            await brick.watchtowerClaimState({
+                autoIncrement: 0,
+                aliceSig,
+                bobSig
+            }, i, { from: watchtowers[i] })
+            if (i == 5) {
+                await truffleAssert.reverts(
+                    brick.watchtowerClaimState({
+                        autoIncrement: 0,
+                        aliceSig,
+                        bobSig
+                    }, i, { from: watchtowers[i] }),
+                    'Each watchtower can only submit one pessimistic state'
+                )
+            }
+        }
+        await truffleAssert.reverts(
+            brick.watchtowerClaimState({
+                autoIncrement: 0,
+                aliceSig,
+                bobSig
+            }, t, { from: watchtowers[t] }),
+            'Watchtower race is complete'
+        )
+        encoded = hexToBytes(
+            web3.eth.abi.encodeParameters(
+                [
+                    'address',
+                    {
+                        ChannelState: {
+                            aliceValue: 'uint256',
+                            bobValue: 'uint256',
+                            autoIncrement: 'uint16'
+                        }
+                    }
+                ],
+                [
+                    brick.address,
+                    [state3.aliceValue, state3.bobValue, state3.autoIncrement]
+                ]
+            )
+        )
+        aliceSig = offchainSign(encoded, alicePrivate)
+        await truffleAssert.reverts(
+            brick.pessimisticClose(state3, aliceSig, [], { from: bob }),
+            'Channel must close at latest state'
         )
     })
 })
