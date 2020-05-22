@@ -12,9 +12,7 @@ contract('Brick', (accounts) => {
     const FEE = 20
     const watchtowers = []
     // mnemonic: attack guess know manual soap original panel cabbage firm horn whale party
-    const aliceAddress = '0x1b501D99fd12cbce4BC87e83EFda420B76C1F01c'
     const alicePrivate = '0x1c56446a08c77d9fe6b47d94f81908c3346dc1230d7e48b3fccf97747c665f7b'
-    const bobAddress = '0xc0D6A8F72aacCAc4B006E6D5870313d846365396'
     const bobPrivate = '0x99fdca82537fb4815cd41215f370e19214d6d77b4705840a16bee5bf3bfa4e59'
     const evePrivate = '0xcc6cb8bf2030d7844113e19b5df953dafa505be01ef36677b1b0a1298fc9df1d'
     const watchtowersPrivates = [
@@ -444,6 +442,7 @@ contract('Brick', (accounts) => {
     })
 
     it('closes pessimistically', async () => {
+        // TODO: test with Alice pessimistically closing too
         const brick = await makeOpenBrick()
         const aliceSig = signAutoIncrement(brick.address, 3, alicePrivate),
               bobSig = signAutoIncrement(brick.address, 3, bobPrivate)
