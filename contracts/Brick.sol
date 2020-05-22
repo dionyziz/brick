@@ -196,6 +196,8 @@ contract Brick {
         require(validAnnouncement(announcement), 'Announcement does not have valid signatures by Alice and Bob');
         require(msg.sender == _watchtowers[idx], 'This is not the watchtower claimed');
         require(!_watchtowerClaimedClose[idx], 'Each watchtower can only submit one pessimistic state');
+        require(_numWatchtowerClaims < _t, 'Watchtower race is complete');
+
         _watchtowerLastClaim[idx] = announcement;
         _watchtowerClaimedClose[idx] = true;
         ++_numWatchtowerClaims;
