@@ -34,7 +34,7 @@ ax.plot(range(3, 3 + len(data['optimisticClose'])), data['optimisticClose'], 'b-
 
 ax.axvline(x=13, label='Recommended $n$', color='orange', linestyle='--')
 
-ax.set_title('Gas cost of a Brick channel')
+ax.set_title('Gas cost of a $\\textsc{Brick}$ channel')
 ax.set_ylabel('EUR')
 
 def eur2eth(eur):
@@ -47,7 +47,7 @@ def eth2eur(eth):
 
 secax = ax.secondary_yaxis('right', functions=(eur2eth, eth2eur))
 secax.set_ylabel('Ether')
-ax.set_xlabel('Number $n$ of watchtower participants')
+ax.set_xlabel('Number $n$ of $\\textsc{Wardens}$')
 plt.legend()
 # plt.axis([0, len(data['open']), 0, 20])
 
