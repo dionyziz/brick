@@ -103,7 +103,7 @@ contract Brick {
     }
 
     function fundBob() external payable atPhase(BrickPhase.AliceFunded) {
-        // todo: make channel updatable while it is open
+        // TODO: make channel updatable while it is open
         require(msg.value >= FEE / 2, 'Bob must pay at least the fee');
         _initialState.bobValue = msg.value - FEE / 2;
         _bobFunded = true;
