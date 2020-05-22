@@ -1,3 +1,20 @@
+const channelStateType = {
+    'aliceValue': 'uint256',
+    'bobValue': 'uint256',
+    'autoIncrement': 'uint16'
+}
+const stateType = ['address', { ChannelState: channelStateType }]
+const autoIncrementType = ['address', 'uint16']
+
+function hexToBytes(hex) {
+    let bytes = ''
+
+    for (let c = 0; c < hex.length; c += 2) {
+        bytes += String.fromCharCode(parseInt(hex.substr(c, 2), 16))
+    }
+    return bytes
+}
+
 function offchainSign(msg, privateKey) {
     const msgHex = Buffer.from(msg, 'latin1').toString('hex')
     const msgHashHex = web3.utils.keccak256('0x' + msgHex)
@@ -9,34 +26,24 @@ function offchainSign(msg, privateKey) {
     return { v, r, s }
 }
 
-function signState(state, privateKey) {
+function signRawMessage(type, rawValue, privateKey) {
     const encodedMsg = hexToBytes(web3.eth.abi.encodeParameters(
-        [
-            'address',
-            {
-                ChannelState: {
-                    'aliceValue': 'uint256',
-                    'bobValue': 'uint256',
-                    'autoIncrement': 'uint16'
-                }
-            }
-        ],
-        [
-            brick.address,
-            state3
-        ]
+        type, rawValue
     ).slice(2))
 
     return offchainSign(encodedMsg, privateKey)
 }
 
-function hexToBytes(hex) {
-    let bytes = ''
-
-    for (let c = 0; c < hex.length; c += 2) {
-        bytes += String.fromCharCode(parseInt(hex.substr(c, 2), 16))
-    }
-    return bytes
+function signState(address, state, privateKey) {
+    return signRawMessage(stateType, [address, state], privateKey)
 }
 
-module.exports = { offchainSign, signState, hexToBytes }
+function signAutoIncrement(address, autoIncrement, privateKey) {
+    return signRawMessage(
+        autoIncrementType,
+        [address, autoIncrement],
+        privateKey
+    )
+}
+
+module.exports = { hexToBytes, offchainSign, signState, signAutoIncrement }

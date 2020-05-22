@@ -1,5 +1,5 @@
 const truffleAssert = require('truffle-assertions')
-const { offchainSign, hexToBytes } = require('../src/brick')
+const { offchainSign, hexToBytes, signState, signAutoIncrement } = require('../src/brick')
 const Brick = artifacts.require('Brick')
 
 contract('Brick', (accounts) => {
@@ -398,18 +398,8 @@ contract('Brick', (accounts) => {
             'does not have valid signatures'
         )
 
-        let encoded = hexToBytes(web3.eth.abi.encodeParameters(
-            [
-                'address',
-                'uint16'
-            ],
-            [
-                brick.address,
-                0
-            ]
-        ).slice(2))
-        aliceSig = offchainSign(encoded, alicePrivate)
-        bobSig = offchainSign(encoded, bobPrivate)
+        aliceSig = signAutoIncrement(brick.address, 0, alicePrivate)
+        bobSig = signAutoIncrement(brick.address, 0, bobPrivate)
 
         await truffleAssert.reverts(
             brick.watchtowerClaimState({
@@ -445,25 +435,7 @@ contract('Brick', (accounts) => {
             }, t, { from: watchtowers[t] }),
             'Watchtower race is complete'
         )
-        encoded = hexToBytes(
-            web3.eth.abi.encodeParameters(
-                [
-                    'address',
-                    {
-                        ChannelState: {
-                            aliceValue: 'uint256',
-                            bobValue: 'uint256',
-                            autoIncrement: 'uint16'
-                        }
-                    }
-                ],
-                [
-                    brick.address,
-                    [state3.aliceValue, state3.bobValue, state3.autoIncrement]
-                ]
-            )
-        )
-        aliceSig = offchainSign(encoded, alicePrivate)
+        aliceSig = signState(brick.address, state3, alicePrivate)
         await truffleAssert.reverts(
             brick.pessimisticClose(state3, aliceSig, [], { from: bob }),
             'Channel must close at latest state'
@@ -472,12 +444,8 @@ contract('Brick', (accounts) => {
 
     it('closes pessimistically', async () => {
         const brick = await makeOpenBrick()
-        const encodedAutoIncrement = hexToBytes(web3.eth.abi.encodeParameters(
-            ['address', 'uint16'],
-            [brick.address, 3]
-        ).slice(2))
-        const aliceSig = offchainSign(encodedAutoIncrement, alicePrivate),
-              bobSig = offchainSign(encodedAutoIncrement, bobPrivate)
+        const aliceSig = signAutoIncrement(brick.address, 3, alicePrivate),
+              bobSig = signAutoIncrement(brick.address, 3, bobPrivate)
 
         for (let i = 0; i < t; ++i) {
             await brick.watchtowerClaimState({
@@ -486,45 +454,13 @@ contract('Brick', (accounts) => {
                 bobSig
             }, i, { from: watchtowers[i] })
         }
-        const encodedBadState = hexToBytes(web3.eth.abi.encodeParameters(
-            [
-                'address',
-                {
-                    ChannelState: {
-                        'aliceValue': 'uint256',
-                        'bobValue': 'uint256',
-                        'autoIncrement': 'uint16'
-                    }
-                }
-            ],
-            [
-                brick.address,
-                {
-                    aliceValue: 2,
-                    bobValue: 1,
-                    autoIncrement: 3
-                }
-            ]
-        ).slice(2))
-        const encodedGoodState = hexToBytes(web3.eth.abi.encodeParameters(
-            [
-                'address',
-                {
-                    ChannelState: {
-                        'aliceValue': 'uint256',
-                        'bobValue': 'uint256',
-                        'autoIncrement': 'uint16'
-                    }
-                }
-            ],
-            [
-                brick.address,
-                state3
-            ]
-        ).slice(2))
-        const aliceStateGoodSig = offchainSign(encodedGoodState, alicePrivate)
-        const aliceStateBadSig = offchainSign(encodedBadState, alicePrivate)
-        const eveSig = offchainSign(encodedGoodState, eve)
+        const aliceStateGoodSig = signState(brick.address, state3, alicePrivate)
+        const aliceStateBadSig = signState(brick.address, {
+            aliceValue: 2,
+            bobValue: 1,
+            autoIncrement: 3
+        }, alicePrivate)
+        const eveSig = signState(brick.address, state3, eve)
 
         await truffleAssert.reverts(
             brick.pessimisticClose(state3, aliceStateBadSig, [], { from: bob }),
