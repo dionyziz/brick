@@ -16,6 +16,7 @@ contract('Brick', (accounts) => {
     const alicePrivate = '0x1c56446a08c77d9fe6b47d94f81908c3346dc1230d7e48b3fccf97747c665f7b'
     const bobAddress = '0xc0D6A8F72aacCAc4B006E6D5870313d846365396'
     const bobPrivate = '0x99fdca82537fb4815cd41215f370e19214d6d77b4705840a16bee5bf3bfa4e59'
+    const evePrivate = '0xcc6cb8bf2030d7844113e19b5df953dafa505be01ef36677b1b0a1298fc9df1d'
     const watchtowersPrivates = [
         '0xcca2de8d9000d2d815b9e15864822a2624b033a6be7b9ddef1d011dbe3d46550',
         '0xf1cf1e1c8dc2aa1a4b8c91a8782188daf9829cad4565d6ae8fac50ceffa3bd1b',
@@ -460,7 +461,7 @@ contract('Brick', (accounts) => {
             bobValue: 1,
             autoIncrement: 3
         }, alicePrivate)
-        const eveSig = signState(brick.address, state3, eve)
+        const eveSig = signState(brick.address, state3, evePrivate)
 
         await truffleAssert.reverts(
             brick.pessimisticClose(state3, aliceStateBadSig, [], { from: bob }),
