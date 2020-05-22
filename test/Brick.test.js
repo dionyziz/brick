@@ -384,14 +384,21 @@ contract('Brick', (accounts) => {
         )
     })
 
-    it('detects pessimistic closing failures', async () => {
-        const brick = await makeOpenBrick()
+    it('detects pessimistic failure conditions', async () => {
+        let brick = await makeFundedBrick()
 
         const invalidSig = {
             v: web3.utils.fromAscii('0'),
             r: web3.utils.fromAscii('0'),
             s: web3.utils.fromAscii('0')
         }
+
+        await truffleAssert.reverts(
+            brick.pessimisticClose(state3, invalidSig, [], { from: eve }),
+            'Channel is not open'
+        )
+
+        brick = await makeOpenBrick()
 
         await truffleAssert.reverts(
             brick.pessimisticClose(state3, invalidSig, [], { from: eve }),
@@ -491,5 +498,76 @@ contract('Brick', (accounts) => {
             brick.pessimisticClose(state3, aliceSig, [], { from: bob }),
             'Channel must close at latest state'
         )
+    })
+
+    it('closes pessimistically', async () => {
+        const brick = await makeOpenBrick()
+        const encodedAutoIncrement = hexToBytes(web3.eth.abi.encodeParameters(
+            ['address', 'uint16'],
+            [brick.address, 3]
+        ).slice(2))
+        const aliceSig = offchainSign(encodedAutoIncrement, alicePrivate),
+              bobSig = offchainSign(encodedAutoIncrement, bobPrivate)
+
+        for (let i = 0; i < t; ++i) {
+            await brick.watchtowerClaimState({
+                autoIncrement: 3,
+                aliceSig,
+                bobSig
+            }, i, { from: watchtowers[i] })
+        }
+        const encodedBadState = hexToBytes(web3.eth.abi.encodeParameters(
+            [
+                'address',
+                {
+                    ChannelState: {
+                        'aliceValue': 'uint256',
+                        'bobValue': 'uint256',
+                        'autoIncrement': 'uint16'
+                    }
+                }
+            ],
+            [
+                brick.address,
+                {
+                    aliceValue: 2,
+                    bobValue: 1,
+                    autoIncrement: 3
+                }
+            ]
+        ).slice(2))
+        const encodedGoodState = hexToBytes(web3.eth.abi.encodeParameters(
+            [
+                'address',
+                {
+                    ChannelState: {
+                        'aliceValue': 'uint256',
+                        'bobValue': 'uint256',
+                        'autoIncrement': 'uint16'
+                    }
+                }
+            ],
+            [
+                brick.address,
+                state3
+            ]
+        ).slice(2))
+        const aliceStateGoodSig = offchainSign(encodedGoodState, alicePrivate)
+        const aliceStateBadSig = offchainSign(encodedBadState, alicePrivate)
+        const eveSig = offchainSign(encodedGoodState, eve)
+
+        await truffleAssert.reverts(
+            brick.pessimisticClose(state3, aliceStateBadSig, [], { from: bob }),
+            'Counterparty must have signed closing state'
+        )
+        await truffleAssert.reverts(
+            brick.pessimisticClose(state3, eveSig, [], { from: bob }),
+            'Counterparty must have signed closing state'
+        )
+        await brick.pessimisticClose(state3, aliceStateGoodSig, [], { from: bob })
+    })
+
+    it('verifies fraud proofs', async () => {
+        // TODO
     })
 })
