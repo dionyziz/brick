@@ -13,6 +13,26 @@ contract('Brick', (accounts) => {
     const eve = accounts[n + 3]
     const FEE = 20
     const watchtowers = []
+    // mnemonic: attack guess know manual soap original panel cabbage firm horn whale party
+    const aliceAddress = '0x1b501D99fd12cbce4BC87e83EFda420B76C1F01c'
+    const alicePrivate = '0x1c56446a08c77d9fe6b47d94f81908c3346dc1230d7e48b3fccf97747c665f7b'
+    const bobPrivate = '0x99fdca82537fb4815cd41215f370e19214d6d77b4705840a16bee5bf3bfa4e59'
+    const watchtowersPrivates = [
+        '0xcca2de8d9000d2d815b9e15864822a2624b033a6be7b9ddef1d011dbe3d46550',
+        '0xf1cf1e1c8dc2aa1a4b8c91a8782188daf9829cad4565d6ae8fac50ceffa3bd1b',
+        '0x22ef6c82a61002bb161fc55e839578cb1d24da126a70cb1d9d177614439fff95',
+        '0x774d8af5c5b711396b5d365ea965b6264e372a263623cc02fc6a3d6aea226b04',
+        '0xcd4c4e12f6a022d7ab9ac97f484a0b41d4e6b6d98c2e938fc7322485f7c6c3da',
+        '0x313a1e791613d3a72e37629c9c590f062fba930d5f1e20dc45d6dcf9e63f7488',
+        '0xdac0b5774f312f74e797bd0618ca088b7e1daeabdad440d11d15939660851c91',
+        '0x38d2a19260bfbb29b5173f9518af66845f15da4f735cc379e791819d8036ad06',
+        '0xe959232644d63a370a58b6d498e3b370b874fe3f0b9b64d3f4bc77cea8acb1b5',
+        '0x158a5a2f76783c5cb5c4861ffe184f3f3ecdb09123b11570e158188e74c33e08',
+        '0x6c34d32422fda973eb33a2f2a42bf184de33c37015665a16941359491dfefac5',
+        '0xbcf8917442048005881b0046acce3d1e5fb7bac4dbd135cdd8fb46c3bb73a413',
+        '0xd150663fcf4efe33f5eb627b802831b26207b92084c894440de30ebe78137695',
+        '0x0bcaebd1fe5cd1b1181bce6b00c63e76ef9e7c4360297378e913218bbcc825be',
+    ]
 
     for (let i = 0; i < n; ++i) {
         watchtowers.push(accounts[i + 2])
@@ -248,47 +268,81 @@ contract('Brick', (accounts) => {
         )
     })
 
-    it.only('validates signatures', async () => {
-        const brick = await makeOpenBrick()
-        // const plaintext = web3.utils.fromAscii('')
-        const PREFIX = "\x19Ethereum Signed Message:\n"
-        const msg = 'hello'
-        console.log('Message: ', msg)
-        // const msgHash = web3.utils.keccak256(msg)
-        const privKeyAlice = '0x46092bd666b76815030b425294f3138b590f68abaa7eb13713e297fa59bafad9'
-        const sig = await web3.eth.sign(msg, alice)
-        console.log('sig', sig)
-        console.log(
-            'Hash of empty string without prefix: ',
-            web3.utils.keccak256('')
-        )
-        console.log(
-            'Hash of empty string with prefix: ',
-            web3.utils.keccak256('\x19Ethereum Signed Message:\n0')
-        )
-        /*
-        const recovered_pk = await web3.eth.accounts.recover(
-            '', sig.v, sig.r, sig.s, false
-        )
-        */
-
-        console.log('expected: ', alice)
-        let recovered_pk = await web3.eth.accounts.recover(msg, sig)
-        console.log('recovered: ', recovered_pk)
+    const sign = async (msg, pk) => {
+        const sig = await web3.eth.sign(msg, pk)
 
         const r = sig.slice(0, 66)
         const s = '0x' + sig.slice(66, 130)
         const v = '0x' + sig.slice(130, 132)
-        // const m = ejsUtils.toBuffer('0xdeadbeef')
 
-        let recovered_pk_2 = await web3.eth.accounts.recover(msg, v, r, s)
-        console.log('recovered from v, r, s', recovered_pk_2)
+        return { v: 28, r, s }
+    }
 
-        const ret = await brick.checkSig.call(
-            alice, web3.utils.keccak256(PREFIX + msg.length + msg), { v, r, s }
+    function hexToBytes(hex) {
+        let bytes = ''
+
+        for (let c = 0; c < hex.length; c += 2) {
+            bytes += String.fromCharCode(parseInt(hex.substr(c, 2), 16))
+        }
+        return bytes
+    }
+
+    function offchainSign(msg, privateKey) {
+        const msgHashHex = web3.utils.keccak256(msg)
+        const sig = web3.eth.accounts.sign(msgHashHex, alicePrivate)
+
+        let { v, r, s } = sig
+        v = parseInt(v, 16)
+
+        return { v, r, s }
+    }
+
+    it('validates signatures', async () => {
+        const brick = await makeOpenBrick()
+        const PREFIX = "\x19Ethereum Signed Message:\n"
+        const msg = 'hello'
+        const msgHashHex = web3.utils.keccak256(msg)
+        const msgHashBytes = hexToBytes(msgHashHex.slice(2))
+
+        const prefixedMessage = PREFIX + msgHashBytes.length + msgHashBytes
+        const prefixedMessageHex = Buffer.from(prefixedMessage, 'latin1').toString('hex')
+        const prefixedMessageHash = web3.utils.keccak256('0x' + prefixedMessageHex)
+
+        let {v, r, s} = offchainSign(msg, alicePrivate)
+
+        assert.equal(
+            await brick.checkSig.call(
+                alice,
+                prefixedMessageHash,
+                { v, r, s }
+            ),
+            true
+        )
+        assert.equal(
+            await brick.checkSig.call(
+                alice,
+                web3.utils.keccak256(msgHashBytes),
+                { v, r, s }
+            ),
+            false
         )
 
-        console.log(ret)
+        assert.equal(
+            await brick.checkPrefixedSig.call(
+                alice,
+                msgHashHex,
+                { v, r, s }
+            ),
+            true
+        )
+        assert.equal(
+            await brick.checkPrefixedSig.call(
+                alice,
+                '0xa' + msgHashHex.slice(3),
+                { v, r, s }
+            ),
+            false
+        )
     })
 
     it('closes pessimistically', async () => {

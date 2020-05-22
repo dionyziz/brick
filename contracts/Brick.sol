@@ -214,7 +214,7 @@ contract Brick {
                 _initialState.aliceValue + _initialState.bobValue, 'Channel must conserve monetary value');
         require(_numWatchtowerClaims >= _t, 'At least 2f+1 watchtower claims are needed for pessimistic close');
         bytes32 plaintext = keccak256(abi.encode(address(this), closingState));
-        require(checkSig(counterparty(msg.sender), plaintext, counterpartySig), 'Counterparty must have signed closing state');
+        require(checkPrefixedSig(counterparty(msg.sender), plaintext, counterpartySig), 'Counterparty must have signed closing state');
 
         for (uint256 i = 0; i < proofs.length; ++i) {
             uint256 idx = proofs[i].watchtowerIdx;
@@ -253,12 +253,19 @@ contract Brick {
         return ecrecover(plaintext, sig.v, sig.r, sig.s) == pk;
     }
 
+    function checkPrefixedSig(address pk, bytes32 message, ECSignature memory sig)
+    public pure returns(bool) {
+        bytes32 prefixedHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", message));
+
+        return ecrecover(prefixedHash, sig.v, sig.r, sig.s) == pk;
+    }
+
     function validAnnouncement(Announcement memory announcement)
     internal view returns(bool) {
         bytes32 plaintext = keccak256(abi.encode(address(this), announcement.autoIncrement));
 
-        return checkSig(_alice, plaintext, announcement.aliceSig) &&
-               checkSig(_bob, plaintext, announcement.bobSig);
+        return checkPrefixedSig(_alice, plaintext, announcement.aliceSig) &&
+               checkPrefixedSig(_bob, plaintext, announcement.bobSig);
     }
 
     function counterparty(address party)
@@ -279,7 +286,7 @@ contract Brick {
 
     function validFraudProof(FraudProof memory proof)
     internal view returns (bool) {
-        return checkSig(
+        return checkPrefixedSig(
             _watchtowers[proof.watchtowerIdx],
             keccak256(abi.encode(address(this), proof.statePoint.autoIncrement)),
             proof.watchtowerSig
