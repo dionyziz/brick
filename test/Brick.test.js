@@ -33,12 +33,10 @@ contract('Brick', (accounts) => {
     ]
     const initialState = {
         aliceValue: 5,
-        bobValue: 12,
         autoIncrement: 0
     }
     const state3 = {
         aliceValue: 1,
-        bobValue: 1,
         autoIncrement: 3
     }
     const overdraftState = {
@@ -91,10 +89,10 @@ contract('Brick', (accounts) => {
         await truffleAssert.reverts(brick.fundWatchtower(0, { from: watchtowers[0] }), '', 'Watchtower cannot fund before Bob')
         await fundBob(brick)
         assert.equal(await brick._bobFunded(), true)
-        const {aliceValue, bobValue, autoIncrement} = await brick._initialState()
+        const aliceValue = await brick._initialAliceValue()
+        const bobValue = await brick._initialBobValue()
         assert.equal(aliceValue.toNumber(), 5)
         assert.equal(bobValue.toNumber(), 12)
-        assert.equal(autoIncrement.toNumber(), 0)
 
         await truffleAssert.reverts(brick.fundWatchtower(5, { from: watchtowers[5] }), 'Watchtower must pay at least the collateral')
 
@@ -231,12 +229,9 @@ contract('Brick', (accounts) => {
         const brick = await makeFundedBrick()
 
         await truffleAssert.reverts(
-            brick.optimisticAliceClose({
-                aliceValue: 5,
-                bobValue: 12,
-                autoIncrement: 1
-            }),
-            '', 'Should not close channel that is not open'
+            brick.optimisticAliceClose(5),
+            '',
+            'Should not close channel that is not open'
         )
 
         await brick.open()
@@ -247,19 +242,11 @@ contract('Brick', (accounts) => {
         )
 
         await truffleAssert.reverts(
-            brick.optimisticAliceClose({
-                aliceValue: 6,
-                bobValue: 12,
-                autoIncrement: 1
-            }),
+            brick.optimisticAliceClose(226),
             'cannot close at a higher value than it began'
         )
 
-        await brick.optimisticAliceClose({
-            aliceValue: 4,
-            bobValue: 13,
-            autoIncrement: 1
-        }),
+        await brick.optimisticAliceClose(4)
 
         await assertBalanceDiff(
             [{
@@ -457,7 +444,6 @@ contract('Brick', (accounts) => {
         const aliceStateGoodSig = signState(brick.address, state3, alicePrivate)
         const aliceStateBadSig = signState(brick.address, {
             aliceValue: 2,
-            bobValue: 1,
             autoIncrement: 3
         }, alicePrivate)
         const eveSig = signState(brick.address, state3, evePrivate)

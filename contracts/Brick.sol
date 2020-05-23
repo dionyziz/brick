@@ -12,7 +12,6 @@ contract Brick {
     }
     struct ChannelState {
         uint256 aliceValue;
-        uint256 bobValue;
         uint16 autoIncrement;
     }
     struct ECSignature {
@@ -31,6 +30,8 @@ contract Brick {
         uint8 watchtowerIdx;
     }
 
+    uint256 public _initialAliceValue;
+    uint256 public _initialBobValue;
     uint8 public _n;
     uint8 public _t;
     uint256 constant public FEE = 20 wei; // must be even
@@ -39,7 +40,6 @@ contract Brick {
     address payable public _bob;
     address payable[] public _watchtowers;
     BrickPhase public _phase;
-    ChannelState public _initialState;
     bool[] public _watchtowerFunded;
     uint256 public _collateral = 0;
     bool public _bobFunded = false;
@@ -52,7 +52,7 @@ contract Brick {
     uint8 _numWatchtowerClaims = 0;
     uint16 _maxWatchtowerAutoIncrementClaim = 0;
     bool _aliceWantsClose = false;
-    ChannelState _aliceClaimedClosingState;
+    uint256 _aliceClaimedClosingValue;
     uint8 _numHonestClosingWatchtowers = 0;
 
     modifier atPhase(BrickPhase phase) {
@@ -92,7 +92,7 @@ contract Brick {
         // but the contract does not need to check this here.
         // require(msg.value >= FEE / 2, 'Alice must pay at least the fee');
         _alice = msg.sender;
-        _initialState.aliceValue = msg.value - FEE / 2;
+        _initialAliceValue = msg.value - FEE / 2;
         _bob = bob;
         _watchtowers = watchtowers;
         for (uint8 i = 0; i < _n; ++i) {
@@ -105,11 +105,11 @@ contract Brick {
     function fundBob() external payable atPhase(BrickPhase.AliceFunded) {
         // TODO: make channel updatable while it is open
         require(msg.value >= FEE / 2, 'Bob must pay at least the fee');
-        _initialState.bobValue = msg.value - FEE / 2;
+        _initialBobValue = msg.value - FEE / 2;
         _bobFunded = true;
         // TODO: Check that ceil here is incentive-compatible for watchtower hostage situation
         if (_f > 0) {
-            _collateral = divceil(_initialState.aliceValue + _initialState.bobValue, _f);
+            _collateral = BrickBase.divceil(_initialAliceValue + _initialBobValue, _f);
         }
         _phase = BrickPhase.BobFunded;
     }
@@ -131,12 +131,12 @@ contract Brick {
         if (msg.sender == _alice) {
             require(!_aliceRecovered, 'Alice has already withdrawn');
             _aliceRecovered = true;
-            amount = _initialState.aliceValue + FEE / 2;
+            amount = _initialAliceValue + FEE / 2;
         }
         else if (msg.sender == _bob) {
             require(_bobFunded, 'Bob has already withdrawn');
             _bobFunded = false;
-            amount = _initialState.bobValue + FEE / 2;
+            amount = _initialBobValue + FEE / 2;
         }
         else if (msg.sender == _watchtowers[idx]) {
             require(_watchtowerFunded[idx], 'This watchtower has already withdrawn');
@@ -160,31 +160,26 @@ contract Brick {
         _phase = BrickPhase.Open;
     }
 
-    function optimisticAliceClose(ChannelState memory closingState)
+    function optimisticAliceClose(uint256 closingAliceValue)
     public openOnly aliceOnly {
         // Alice should stop using the channel off-chain once this
         // function is called.
-        require(closingState.aliceValue + closingState.bobValue <=
-                _initialState.aliceValue + _initialState.bobValue, 'Channel cannot close at a higher value than it began at');
+        require(closingAliceValue <=
+                _initialAliceValue + _initialBobValue, 'Channel cannot close at a higher value than it began at');
         // Ensure Alice doesn't later change her mind about the value
         // in a malicious attempt to frontrun bob's optimisticBobClose()
         require(!_aliceWantsClose, 'Alice can only decide to close with one state');
         _aliceWantsClose = true;
-        _aliceClaimedClosingState = closingState;
+        _aliceClaimedClosingValue = closingAliceValue;
     }
 
     function optimisticBobClose()
     public openOnly bobOnly {
         require(_aliceWantsClose, 'Bob cannot close on his own volition');
 
-        optimisticClose(_aliceClaimedClosingState);
-    }
-
-    function optimisticClose(ChannelState memory closingState)
-    internal openOnly {
         _phase = BrickPhase.Closed;
-        _alice.transfer(closingState.aliceValue + FEE / 2);
-        _bob.transfer(closingState.bobValue + FEE / 2);
+        _alice.transfer(_aliceClaimedClosingValue + FEE / 2);
+        _bob.transfer(_initialBobValue + _initialAliceValue - _aliceClaimedClosingValue + FEE / 2);
 
         for (uint256 idx = 0; idx < _n; ++idx) {
             _watchtowers[idx].transfer(_collateral);
@@ -212,8 +207,8 @@ contract Brick {
     public openOnly {
         require(msg.sender == _alice || msg.sender == _bob, 'Only Alice or Bob can pessimistically close the channel');
         require(_bestAnnouncement.autoIncrement == closingState.autoIncrement, 'Channel must close at latest state');
-        require(closingState.aliceValue + closingState.bobValue <=
-                _initialState.aliceValue + _initialState.bobValue, 'Channel must conserve monetary value');
+        require(closingState.aliceValue <=
+                _initialAliceValue + _initialBobValue, 'Channel must conserve monetary value');
         require(_numWatchtowerClaims >= _t, 'At least 2f+1 watchtower claims are needed for pessimistic close');
         bytes32 plaintext = keccak256(abi.encode(address(this), closingState));
         require(checkPrefixedSig(counterparty(msg.sender), plaintext, counterpartySig), 'Counterparty must have signed closing state');
@@ -231,12 +226,10 @@ contract Brick {
 
         if (proofs.length <= _f) {
             _alice.transfer(closingState.aliceValue);
-            _bob.transfer(closingState.bobValue);
+            _bob.transfer(_initialAliceValue + _initialBobValue - closingState.aliceValue);
         }
         else {
-            counterparty(msg.sender).transfer(
-                closingState.aliceValue + closingState.bobValue
-            );
+            counterparty(msg.sender).transfer(_initialAliceValue + _initialBobValue);
         }
         msg.sender.transfer(_collateral * proofs.length);
     }

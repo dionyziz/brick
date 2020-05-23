@@ -1,6 +1,5 @@
 const channelStateType = {
     'aliceValue': 'uint256',
-    'bobValue': 'uint256',
     'autoIncrement': 'uint16'
 }
 const stateType = ['address', { ChannelState: channelStateType }]

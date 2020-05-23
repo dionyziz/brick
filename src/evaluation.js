@@ -82,9 +82,7 @@ async function gasCost(n) {
     winston.info(`Gas for open call: ${openCallGas.toNumber()}`)
     const openGas = aliceFundGas.add(bobFundGas).add(watchtowersGas).add(openCallGas)
 
-    tx = await brick.optimisticAliceClose({
-        aliceValue: 5, bobValue: 12, autoIncrement: 0
-    })
+    tx = await brick.optimisticAliceClose(5)
     const aliceCloseGas = web3.utils.toBN(tx.receipt.gasUsed)
     tx = await brick.optimisticBobClose({ from: bob })
     const bobCloseGas = web3.utils.toBN(tx.receipt.gasUsed)
@@ -120,7 +118,6 @@ async function gasCost(n) {
     winston.info(`Gas used by watchtower claims in pessimistic close: ${watchtowerClaimsGas}`)
     const state3 = {
         aliceValue: 10,
-        bobValue: 7,
         autoIncrement: 3
     }
     aliceSig = signState(brick.address, state3, alicePrivate)
