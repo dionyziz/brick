@@ -37,6 +37,7 @@ contract Brick {
         uint8 watchtowerIdx;
     }
 
+    mapping (uint16 => bool) announcementAutoIncrementSigned;
     uint256 public _initialAliceValue;
     uint256 public _initialBobValue;
     uint8 public _n;
@@ -265,11 +266,18 @@ contract Brick {
     }
 
     function validAnnouncement(Announcement memory announcement)
-    public view returns(bool) {
+    public returns(bool) {
+        if (announcementAutoIncrementSigned[announcement.autoIncrement]) {
+            return true;
+        }
         bytes32 message = keccak256(abi.encode(address(this), announcement.autoIncrement));
 
-        return checkPrefixedSig(_alice, message, announcement.aliceSig) &&
-               checkPrefixedSig(_bob, message, announcement.bobSig);
+        if (checkPrefixedSig(_alice, message, announcement.aliceSig) &&
+            checkPrefixedSig(_bob, message, announcement.bobSig)) {
+            announcementAutoIncrementSigned[announcement.autoIncrement] = true;
+            return true;
+        }
+        return false;
     }
 
     function counterparty(address party)

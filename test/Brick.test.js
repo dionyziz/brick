@@ -341,6 +341,34 @@ contract('Brick', (accounts) => {
             ),
             true
         )
+
+        assert.equal(
+            await brick.validAnnouncement.call(
+                {
+                    autoIncrement: 0,
+                    aliceSig,
+                    bobSig
+                },
+                {
+                    from: watchtowers[1]
+                }
+            ),
+            true
+        )
+
+        assert.equal(
+            await brick.validAnnouncement.call(
+                {
+                    autoIncrement: 1,
+                    aliceSig,
+                    bobSig
+                },
+                {
+                    from: watchtowers[0]
+                }
+            ),
+            false
+        )
     })
 
     it('detects pessimistic failure conditions', async () => {
