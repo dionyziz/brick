@@ -5,6 +5,13 @@ SPDX-License-Identifier: MIT
 pragma solidity >=0.5.16;
 pragma experimental ABIEncoderV2;
 
+library BrickBase {
+    function divceil(uint a, uint m)
+    internal pure returns (uint) {
+        return (a + m - 1) / m;
+    }
+}
+
 contract Brick {
     enum BrickPhase {
         AliceFunded, BobFunded,
@@ -286,10 +293,5 @@ contract Brick {
             keccak256(abi.encode(address(this), proof.statePoint.autoIncrement)),
             proof.watchtowerSig
         ) && staleClaim(proof);
-    }
-
-    function divceil(uint a, uint m)
-    internal pure returns (uint) {
-        return (a + m - 1) / m;
     }
 }
