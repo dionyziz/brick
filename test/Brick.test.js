@@ -460,19 +460,24 @@ contract('Brick', (accounts) => {
     })
 
     it('closes pessimistically', async () => {
-        // TODO: test with Alice pessimistically closing too
-        const brick = await makeOpenBrick()
-        const aliceSig = signAutoIncrement(brick.address, 3, alicePrivate),
-              bobSig = signAutoIncrement(brick.address, 3, bobPrivate)
+        let brick = await makeOpenBrick()
+        let aliceSig = signAutoIncrement(brick.address, 3, alicePrivate),
+            bobSig = signAutoIncrement(brick.address, 3, bobPrivate)
 
+        const aliceStateGoodSig = signState(brick.address, state3, alicePrivate)
         for (let i = 0; i < t; ++i) {
+            if (i == t - 1) {
+                await truffleAssert.reverts(
+                    brick.pessimisticClose(state3, aliceStateGoodSig, [], { from: bob }),
+                    'At least 2f+1 watchtower claims are needed'
+                )
+            }
             await brick.watchtowerClaimState({
                 autoIncrement: 3,
                 aliceSig,
                 bobSig
             }, i, { from: watchtowers[i] })
         }
-        const aliceStateGoodSig = signState(brick.address, state3, alicePrivate)
         const aliceStateBadSig = signState(brick.address, {
             aliceValue: 2,
             autoIncrement: 3
@@ -488,6 +493,36 @@ contract('Brick', (accounts) => {
             'Counterparty must have signed closing state'
         )
         await brick.pessimisticClose(state3, aliceStateGoodSig, [], { from: bob })
+
+        brick = await makeOpenBrick()
+        await truffleAssert.reverts(
+            brick.watchtowerClaimState({
+                autoIncrement: 3,
+                aliceSig,
+                bobSig
+            }, 0, { from: watchtowers[0] }),
+            '',
+            'Must not accept signatures for a different contract instatnce'
+        )
+
+        const aliceSigs = [], bobSigs = []
+
+        for (let i = 0; i <= 3; ++i) {
+            aliceSigs.push(signAutoIncrement(brick.address, i, alicePrivate))
+            bobSigs.push(signAutoIncrement(brick.address, i, bobPrivate))
+        }
+
+        for (let i = n - 1; i >= n - t; --i) {
+            await brick.watchtowerClaimState({
+                autoIncrement: i % 4,
+                aliceSig: aliceSigs[i % 4],
+                bobSig: bobSigs[i % 4]
+            }, i, { from: watchtowers[i] })
+        }
+
+        const bobStateGoodSig = signState(brick.address, state3, bobPrivate)
+
+        await brick.pessimisticClose(state3, bobStateGoodSig, [])
     })
 
     it('verifies fraud proofs', async () => {
