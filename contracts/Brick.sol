@@ -49,19 +49,19 @@ contract Brick {
     address payable[] public _watchtowers;
     BrickPhase public _phase;
     bool[] public _watchtowerFunded;
-    uint256 public _collateral = 0;
-    bool public _bobFunded = false;
-    bool _aliceRecovered = false;
-    bool _bobRecovered = false;
+    uint256 public _collateral;
+    bool public _bobFunded;
+    bool _aliceRecovered;
+    bool _bobRecovered;
 
     Announcement[] _watchtowerLastClaim;
     Announcement _bestAnnouncement;
     bool[] _watchtowerClaimedClose;
-    uint8 _numWatchtowerClaims = 0;
-    uint16 _maxWatchtowerAutoIncrementClaim = 0;
-    bool _aliceWantsClose = false;
+    uint8 _numWatchtowerClaims;
+    uint16 _maxWatchtowerAutoIncrementClaim;
+    bool _aliceWantsClose;
     uint256 _aliceClaimedClosingValue;
-    uint8 _numHonestClosingWatchtowers = 0;
+    uint8 _numHonestClosingWatchtowers;
 
     modifier atPhase(BrickPhase phase) {
         require(_phase == phase, 'Invalid phase');
