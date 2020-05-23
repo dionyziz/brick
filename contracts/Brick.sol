@@ -54,7 +54,7 @@ contract Brick {
     bool _aliceRecovered;
     bool _bobRecovered;
 
-    Announcement[] _watchtowerLastClaim;
+    uint16[] _watchtowerLastAutoIncrement;
     Announcement _bestAnnouncement;
     bool[] _watchtowerClaimedClose;
     uint8 _numWatchtowerClaims;
@@ -106,7 +106,7 @@ contract Brick {
         for (uint8 i = 0; i < _n; ++i) {
             _watchtowerFunded.push(false);
             _watchtowerClaimedClose.push(false);
-            _watchtowerLastClaim.push(Announcement(0, ECSignature(0, 0, 0), ECSignature(0, 0, 0)));
+            _watchtowerLastAutoIncrement.push(0);
         }
 
         _phase = BrickPhase.AliceFunded;
@@ -203,7 +203,7 @@ contract Brick {
         require(!_watchtowerClaimedClose[idx], 'Each watchtower can only submit one pessimistic state');
         require(_numWatchtowerClaims < _t, 'Watchtower race is complete');
 
-        _watchtowerLastClaim[idx] = announcement;
+        _watchtowerLastAutoIncrement[idx] = announcement.autoIncrement;
         _watchtowerClaimedClose[idx] = true;
         ++_numWatchtowerClaims;
 
@@ -293,7 +293,7 @@ contract Brick {
         uint256 watchtowerIdx = proof.watchtowerIdx;
 
         return proof.statePoint.autoIncrement >
-               _watchtowerLastClaim[watchtowerIdx].autoIncrement;
+               _watchtowerLastAutoIncrement[watchtowerIdx];
     }
 
     function validFraudProof(FraudProof memory proof)
