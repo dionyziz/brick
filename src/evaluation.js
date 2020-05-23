@@ -58,15 +58,20 @@ async function gasCost(n) {
     }
 
     winston.info('Constructing brick')
-    let brick = await Brick.new(bob, watchtowers, { value: FEE / 2 + 5 })
+    let brick = await Brick.new()
 
     // winston.info('Getting receipt')
     const receipt = await web3.eth.getTransactionReceipt(brick.transactionHash)
     winston.info('Calculating gas for construction')
-    const aliceFundGas = web3.utils.toBN(receipt.gasUsed)
+    const deployGas = web3.utils.toBN(receipt.gasUsed)
+    winston.warn(`Gas for deployment: ${deployGas.toString()}`)
+    const deployGasEUR = await gasInEUR(deployGas)
+
+    let tx = await brick.aliceFund(bob, watchtowers, { value: FEE / 2 + 5 })
+    const aliceFundGas = web3.utils.toBN(tx.receipt.gasUsed)
     winston.warn(`Gas for Alice fund: ${aliceFundGas.toString()}`)
 
-    let tx = await brick.fundBob({ from: bob, value: FEE / 2 + 12 })
+    tx = await brick.fundBob({ from: bob, value: FEE / 2 + 12 })
     const bobFundGas = web3.utils.toBN(tx.receipt.gasUsed)
     winston.warn(`Gas for Bob fund: ${bobFundGas.toString()}`)
 
@@ -82,6 +87,7 @@ async function gasCost(n) {
     const openCallGas = web3.utils.toBN(tx.receipt.gasUsed)
     winston.warn(`Gas for open call: ${openCallGas.toNumber()}`)
     const openGas = aliceFundGas.add(bobFundGas).add(watchtowersGas).add(openCallGas)
+    winston.warn(`Total open gas: ${openGas.toString()}`)
 
     tx = await brick.optimisticAliceClose(5)
     const aliceCloseGas = web3.utils.toBN(tx.receipt.gasUsed)
@@ -90,13 +96,13 @@ async function gasCost(n) {
     const optimisticCloseGas = aliceCloseGas.add(bobCloseGas)
     winston.warn(`Gas used for optimistic close: ${optimisticCloseGas}`)
 
-    winston.info(`Total open gas: ${openGas.toString()}`)
     const openGasEUR = await gasInEUR(openGas)
     winston.info(`Total open gas cost (EUR): ${openGasEUR}`)
 
     const optimisticCloseGasEUR = await gasInEUR(optimisticCloseGas)
 
-    brick = await Brick.new(bob, watchtowers, { value: FEE / 2 + 5 })
+    brick = await Brick.new()
+    await brick.aliceFund(bob, watchtowers, { value: FEE / 2 + 5 })
     await brick.fundBob({ from: bob, value: FEE / 2 + 12 })
     for (let idx = 0; idx < n; ++idx) {
         await brick.fundWatchtower(idx, { from: watchtowers[idx], value: 50 })
@@ -115,6 +121,7 @@ async function gasCost(n) {
             bobSig
         }, i, { from: watchtowers[i] })
         watchtowerClaimsGas = watchtowerClaimsGas.add(web3.utils.toBN(tx.receipt.gasUsed))
+        winston.warn(`Gas used by watchtower claim ${i}: ${web3.utils.toBN(tx.receipt.gasUsed)}`)
     }
     winston.warn(`Gas used by watchtower claims in pessimistic close: ${watchtowerClaimsGas}`)
     const state3 = {
@@ -130,6 +137,7 @@ async function gasCost(n) {
     winston.info(`Total pessimistic close gas (EUR): ${pessimisticCloseGasEUR} €`)
 
     return {
+        deploy: deployGasEUR.toFixed(2),
         open: openGasEUR.toFixed(2),
         optimisticClose: optimisticCloseGasEUR.toFixed(2),
         pessimisticClose: pessimisticCloseGasEUR.toFixed(2)
@@ -141,6 +149,7 @@ module.exports = async (callback) => {
         const Promise = require('bluebird')
         const fs = Promise.promisifyAll(require('fs'))
         const graphs = {
+            deploy: [],
             open: [],
             optimisticClose: [],
             pessimisticClose: []
@@ -148,6 +157,7 @@ module.exports = async (callback) => {
 
         for (let n = 3; n <= 30; ++n) {
             const cost = await gasCost(n)
+            graphs.deploy.push(cost.deploy)
             graphs.open.push(cost.open)
             graphs.optimisticClose.push(cost.optimisticClose)
             graphs.pessimisticClose.push(cost.pessimisticClose)

@@ -49,8 +49,11 @@ contract('Brick', (accounts) => {
         watchtowers.push(accounts[i + 2])
     }
 
-    const makeBrick = () =>
-        Brick.new(bob, watchtowers, { value: FEE / 2 + 5 })
+    const makeBrick = async () => {
+        const brick = await Brick.new()
+        await brick.aliceFund(bob, watchtowers, { value: FEE / 2 + 5 })
+        return brick
+    }
 
     const fundBob = (brick) =>
         brick.fundBob({ from: bob, value: FEE / 2 + 12 })

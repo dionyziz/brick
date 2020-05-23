@@ -20,14 +20,17 @@ rc(
 with open('data.json') as f:
     data = json.load(f)
 
-data['open'] = list(map(lambda x: float(x), data['open']))
-data['optimisticClose'] = list(map(lambda x: float(x), data['optimisticClose']))
-data['pessimisticClose'] = list(map(lambda x: float(x), data['pessimisticClose']))
+def graphToFloat(graph):
+    return list(map(lambda x: float(x), graph))
+
+for key in data:
+    data[key] = graphToFloat(data[key])
 
 fig, ax = plt.subplots(constrained_layout=True)
 fig.set_size_inches(6.2, 6.2)
-ax.set_ylim(0.0, 24.0)
+ax.set_ylim(0.0, 15.0)
 
+ax.plot(range(3, 3 + len(data['deploy'])), data['deploy'], 'purple', label='Cost of deployment')
 ax.plot(range(3, 3 + len(data['open'])), data['open'], 'r-o', label='Cost of opening')
 ax.plot(range(3, 3 + len(data['pessimisticClose'])), data['pessimisticClose'], 'g-o', label='Cost of pessimistic close')
 ax.plot(range(3, 3 + len(data['optimisticClose'])), data['optimisticClose'], 'b-o', label='Cost of optimistic close')

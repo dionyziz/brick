@@ -14,7 +14,7 @@ library BrickBase {
 
 contract Brick {
     enum BrickPhase {
-        AliceFunded, BobFunded,
+        Deployed, AliceFunded, BobFunded,
         Open, Cancelled, Closed
     }
     struct ChannelState {
@@ -82,8 +82,8 @@ contract Brick {
         _;
     }
 
-    constructor(address payable bob, address payable[] memory watchtowers)
-    public payable {
+    function aliceFund(address payable bob, address payable[] memory watchtowers)
+    public payable atPhase(BrickPhase.Deployed) {
         // TODO: watchtower privacy
         // This requirement is needed to ensure watchtowers are not
         // held hostage. If this requirement is not needed, the contract
@@ -107,6 +107,8 @@ contract Brick {
             _watchtowerClaimedClose.push(false);
             _watchtowerLastClaim.push(Announcement(0, ECSignature(0, 0, 0), ECSignature(0, 0, 0)));
         }
+
+        _phase = BrickPhase.AliceFunded;
     }
 
     function fundBob() external payable atPhase(BrickPhase.AliceFunded) {
