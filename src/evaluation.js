@@ -3,6 +3,7 @@ const winston = require('winston')
 
 winston.configure({
     format: winston.format.simple(),
+    level: 'warn',
     transports: [
         new winston.transports.Console({ json: false, colorize: true })
     ]
@@ -63,11 +64,11 @@ async function gasCost(n) {
     const receipt = await web3.eth.getTransactionReceipt(brick.transactionHash)
     winston.info('Calculating gas for construction')
     const aliceFundGas = web3.utils.toBN(receipt.gasUsed)
-    winston.info(`Gas for Alice fund: ${aliceFundGas.toString()}`)
+    winston.warn(`Gas for Alice fund: ${aliceFundGas.toString()}`)
 
     let tx = await brick.fundBob({ from: bob, value: FEE / 2 + 12 })
     const bobFundGas = web3.utils.toBN(tx.receipt.gasUsed)
-    winston.info(`Gas for Bob fund: ${bobFundGas.toString()}`)
+    winston.warn(`Gas for Bob fund: ${bobFundGas.toString()}`)
 
     let watchtowersGas = web3.utils.toBN(0)
     for (let idx = 0; idx < n; ++idx) {
@@ -76,10 +77,10 @@ async function gasCost(n) {
         watchtowersGas = watchtowersGas.add(web3.utils.toBN(tx.receipt.gasUsed))
         winston.info(`Gas for ${idx}th watchtower ${tx.receipt.gasUsed.toString()}`)
     }
-    winston.info(`Gas for watchtowers: ${watchtowersGas.toNumber()}`)
+    winston.warn(`Gas for watchtowers fund: ${watchtowersGas.toNumber()}`)
     tx = await brick.open()
     const openCallGas = web3.utils.toBN(tx.receipt.gasUsed)
-    winston.info(`Gas for open call: ${openCallGas.toNumber()}`)
+    winston.warn(`Gas for open call: ${openCallGas.toNumber()}`)
     const openGas = aliceFundGas.add(bobFundGas).add(watchtowersGas).add(openCallGas)
 
     tx = await brick.optimisticAliceClose(5)
@@ -87,7 +88,7 @@ async function gasCost(n) {
     tx = await brick.optimisticBobClose({ from: bob })
     const bobCloseGas = web3.utils.toBN(tx.receipt.gasUsed)
     const optimisticCloseGas = aliceCloseGas.add(bobCloseGas)
-    winston.info(`Gas used for optimistic close: ${optimisticCloseGas}`)
+    winston.warn(`Gas used for optimistic close: ${optimisticCloseGas}`)
 
     winston.info(`Total open gas: ${openGas.toString()}`)
     const openGasEUR = await gasInEUR(openGas)
@@ -115,7 +116,7 @@ async function gasCost(n) {
         }, i, { from: watchtowers[i] })
         watchtowerClaimsGas = watchtowerClaimsGas.add(web3.utils.toBN(tx.receipt.gasUsed))
     }
-    winston.info(`Gas used by watchtower claims in pessimistic close: ${watchtowerClaimsGas}`)
+    winston.warn(`Gas used by watchtower claims in pessimistic close: ${watchtowerClaimsGas}`)
     const state3 = {
         aliceValue: 10,
         autoIncrement: 3
@@ -123,7 +124,7 @@ async function gasCost(n) {
     aliceSig = signState(brick.address, state3, alicePrivate)
     tx = await brick.pessimisticClose(state3, aliceSig, [], { from: bob })
     const closeGas = web3.utils.toBN(tx.receipt.gasUsed)
-    winston.info(`Gas used for final pessimistic close() call: ${closeGas}`)
+    winston.warn(`Gas used for final pessimistic close() call: ${closeGas}`)
     const pessimisticCloseGas = watchtowerClaimsGas.add(closeGas)
     const pessimisticCloseGasEUR = await gasInEUR(pessimisticCloseGas)
     winston.info(`Total pessimistic close gas (EUR): ${pessimisticCloseGasEUR} €`)
